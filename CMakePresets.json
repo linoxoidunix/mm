@@ -1,0 +1,154 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Config",
+      "description": "Default build configuration",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_STANDARD": 23,
+        "BUILD_TESTS_MM": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release Config",
+      "description": "Release build configuration",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": 23,
+        "BUILD_TESTS_MM": "ON",
+        "ENABLE_CLANG_TIDY": "OFF"
+      }
+    },
+    {
+      "name": "release-with-tests",
+      "displayName": "Release with Tests",
+      "description": "Release build with tests enabled and optimized",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_STANDARD": 23,
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native -mtune=native -flto=auto",
+        "CMAKE_EXE_LINKER_FLAGS_RELEASE": "-flto=auto",
+        "BUILD_TESTS_MM": "ON",
+        "ENABLE_CLANG_TIDY": "OFF"
+      }
+    },
+    {
+      "name": "relwithdebinfo-tests",
+      "displayName": "RelWithDebInfo with Tests",
+      "description": "Release with debug info and tests",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/relwithdebinfo-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_STANDARD": 23,
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+        "BUILD_TESTS_MM": "ON",
+        "ENABLE_CLANG_TIDY": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release-tests",
+      "displayName": "Build Release Tests",
+      "description": "Build tests in release mode",
+      "configurePreset": "release-with-tests",
+      "configuration": "Release",
+      "targets": [
+        "mm",
+        "tests"
+      ]
+    },
+    {
+      "name": "relwithdebinfo-tests",
+      "displayName": "Build RelWithDebInfo Tests",
+      "description": "Build tests with debug info",
+      "configurePreset": "relwithdebinfo-tests",
+      "configuration": "RelWithDebInfo",
+      "targets": [
+        "mm",
+        "tests"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "release-tests",
+      "displayName": "Run Release Tests",
+      "description": "Run all tests in release mode",
+      "configurePreset": "release-with-tests",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "normal"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 300
+      },
+      "filter": {
+        "include": {
+          "name": "*"
+        }
+      }
+    },
+    {
+      "name": "release-tests-verbose",
+      "displayName": "Run Release Tests (Verbose)",
+      "description": "Run all tests in release mode with verbose output",
+      "configurePreset": "release-with-tests",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 600
+      }
+    },
+    {
+      "name": "release-specific-test",
+      "displayName": "Run Specific Release Test",
+      "description": "Run specific test in release mode (set TEST_NAME variable)",
+      "configurePreset": "release-with-tests",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "normal"
+      },
+      "execution": {
+        "noTestsAction": "error"
+      },
+      "filter": {
+        "include": {
+          "name": "${TEST_NAME}"
+        }
+      }
+    },
+    {
+      "name": "relwithdebinfo-tests",
+      "displayName": "Run RelWithDebInfo Tests",
+      "description": "Run all tests in RelWithDebInfo mode",
+      "configurePreset": "relwithdebinfo-tests",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "normal"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "timeout": 300
+      }
+    }
+  ]
+}

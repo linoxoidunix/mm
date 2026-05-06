@@ -531,52 +531,23 @@ private:
             order.side,
             order.type
         };
-        
-        auto it = std::find_if(bids_.begin(), bids_.end(),
-            [&order](const OrderBookLevel& level) { 
-                return std::abs(level.price - order.price) < kPriceEps; 
+
+        // Ищем позицию, где цена <= order.price (bids: по убыванию)
+        auto it = std::lower_bound(bids_.begin(), bids_.end(), order.price,
+            [](const OrderBookLevel& level, double price) {
+                return level.price > price;
             });
-        
-        if (it != bids_.end()) {
+
+        // Проверяем, есть ли уже уровень с этой ценой
+        if (it != bids_.end() && std::abs(it->price - order.price) < kPriceEps) {
             it->orders.push_back(book_order);
         } else {
+            // Вставляем новый уровень
             OrderBookLevel new_level{order.price, {book_order}};
-            auto insert_pos = std::lower_bound(bids_.begin(), bids_.end(), new_level,
-                [](const OrderBookLevel& a, const OrderBookLevel& b) { 
-                    return a.price > b.price;
-                });
-            bids_.insert(insert_pos, new_level);
+            bids_.insert(it, new_level);
         }
     }
     
-    // // Добавить лимитный ордер в asks
-    // void addToAsks(const Order& order) {
-    //     BookOrder book_order{
-    //         order.order_id,
-    //         order.price,
-    //         order.amount,
-    //         order.filled_amount,
-    //         order.timestamp,
-    //         order.side,
-    //         order.type
-    //     };
-        
-    //     auto it = std::find_if(asks_.begin(), asks_.end(),
-    //         [&order](const OrderBookLevel& level) { 
-    //             return std::abs(level.price - order.price) < kPriceEps; 
-    //         });
-        
-    //     if (it != asks_.end()) {
-    //         it->orders.push_back(book_order);
-    //     } else {
-    //         OrderBookLevel new_level{order.price, {book_order}};
-    //         auto insert_pos = std::lower_bound(asks_.begin(), asks_.end(), new_level,
-    //             [](const OrderBookLevel& a, const OrderBookLevel& b) { 
-    //                 return a.price < b.price;
-    //             });
-    //         asks_.insert(insert_pos, new_level);
-    //     }
-    // }
     void addToAsks(const Order& order) {
         BookOrder book_order{
             order.order_id, order.price, order.amount,
@@ -586,7 +557,7 @@ private:
         // Ищем позицию, где цена >= order.price
         auto it = std::lower_bound(asks_.begin(), asks_.end(), order.price,
             [](const OrderBookLevel& level, double price) {
-                return level.price < price - kPriceEps; 
+                return level.price < price; 
             });
 
         // Проверяем, нашли ли мы существующий уровень цены

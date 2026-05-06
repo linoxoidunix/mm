@@ -47,8 +47,6 @@ private:
     // Данные
     std::shared_ptr<HistoryManager> history_manager;
     bool use_external_history_manager = true;
-    // std::vector<L2Snapshot> l2_data;
-    // std::vector<ExternalTrade> trade_data;
     
     // Состояние ордеров
     std::deque<Order> active_orders;
@@ -203,101 +201,6 @@ public:
     //для дебага
     const MatchingEngine& getMatchingEngine() const { return matching_engine; }
 
-    //генерация отчёта
-    // void generateReport() const {
-    //     if (portfolio_value.empty()) {
-    //         std::cout << "No data to generate report.\n";
-    //         return;
-    //     }
-
-    //     double initial_capital = 1000000.00;
-    //     double final_pnl = portfolio_value.back().second;
-    //     double total_return = final_pnl - initial_capital;
-    //     double return_pct = (total_return / initial_capital) * 100.0;
-
-    //     double max_pnl_so_far = -1e18;
-    //     double max_drawdown = 0.0;
-    //     for (const auto& p : portfolio_value) {
-    //         max_pnl_so_far = std::max(max_pnl_so_far, p.second);
-    //         double drawdown = max_pnl_so_far - p.second;
-    //         max_drawdown = std::max(max_drawdown, drawdown);
-    //     }
-    //     double mdd_pct = (max_drawdown / max_pnl_so_far) * 100.0;
-
-    //     double sum_pnl = 0.0;
-    //     for (const auto& p : portfolio_value) sum_pnl += p.second;
-    //     double mean_pnl = sum_pnl / portfolio_value.size();
-
-    //     double variance = 0.0;
-    //     for (const auto& p : portfolio_value) {
-    //         variance += std::pow(p.second - mean_pnl, 2);
-    //     }
-    //     variance /= portfolio_value.size();
-    //     double stddev = std::sqrt(variance);
-        
-    //     double ann_factor = std::sqrt(252.0 * 6.5 * 3600.0); 
-    //     double sharpe = (stddev > 1e-9) ? (mean_pnl / stddev) * ann_factor : 0.0;
-
-    //     double max_inv = 0.0, min_inv = 0.0, avg_inv = 0.0;
-    //     for (const auto& inv : inventory_history) {
-    //         max_inv = std::max(max_inv, inv.second);
-    //         min_inv = std::min(min_inv, inv.second);
-    //         avg_inv += std::abs(inv.second);
-    //     }
-    //     avg_inv /= (inventory_history.size() > 0 ? inventory_history.size() : 1);
-
-    //     double buy_vol = 0, sell_vol = 0;
-    //     int buy_count = 0, sell_count = 0;
-    //     for (const auto& f : fills) {
-    //         if (f.side == Side::kBid) { buy_vol += f.amount; buy_count++; }
-    //         else { sell_vol += f.amount; sell_count++; }
-    //     }
-
-    //     std::cout << std::fixed << std::setprecision(2);
-    //     std::cout << "\n============================================================\n";
-    //     std::cout << "              HFT DETAILED BACKTEST REPORT                   \n";
-    //     std::cout << "============================================================\n";
-
-    //     std::cout << "\n[1. FINANCIAL PERFORMANCE]\n";
-    //     std::cout << "  Initial Capital:        $" << initial_capital << "\n";
-    //     std::cout << "  Final Equity (MtM):     $" << final_pnl << "\n";
-    //     std::cout << "  Total Net Profit:       $" << (total_return >= 0 ? "+" : "") << total_return << "\n";
-    //     std::cout << "  Total Return:           " << return_pct << "%\n";
-    //     std::cout << "  Total Turnover:         $" << turnover << "\n";
-
-    //     std::cout << "\n[2. RISK METRICS]\n";
-    //     std::cout << "  Max Drawdown:           $" << max_drawdown << " (" << mdd_pct << "%)\n";
-    //     std::cout << "  Annualized Sharpe:      " << std::setprecision(3) << sharpe << "\n";
-    //     std::cout << "  Daily Volatility (PnL): $" << std::setprecision(2) << stddev << "\n";
-
-    //     std::cout << "\n[3. INVENTORY ANALYSIS]\n";
-    //     std::cout << "  Max Long Exposure:      " << max_inv << " units\n";
-    //     std::cout << "  Max Short Exposure:     " << min_inv << " units\n";
-    //     std::cout << "  Average Absolute Inv:   " << avg_inv << " units\n";
-
-    //     std::cout << "\n[4. EXECUTION & ACTIVITY]\n";
-    //     std::cout << "  Total Orders Placed:    " << total_orders_placed << "\n";
-    //     std::cout << "  Total Fills:            " << total_fills << "\n";
-    //     std::cout << "  Fill Rate:              " << (total_orders_placed > 0 ? (100.0 * total_fills / total_orders_placed) : 0.0) << "%\n";
-    //     std::cout << "  Buy Fills / Sell Fills: " << buy_count << " / " << sell_count << "\n";
-    //     std::cout << "  Avg Profit per Fill:    $" << (total_fills > 0 ? total_return / total_fills : 0.0) << "\n";
-
-    //     std::cout << "\n[5. PNL BREAKDOWN]\n";
-    //     std::cout << "  Realized PnL:          $" << std::fixed << std::setprecision(2) << realized_pnl << "\n";
-    //     std::cout << "  Unrealized PnL:        $" << unrealized_pnl << "\n";
-    //     std::cout << "  Total PnL:             $" << (realized_pnl + unrealized_pnl) << "\n";
-        
-    //     if (std::abs(inventory) > kVolEps) {
-    //         std::cout << "  Current Inventory:     " << std::abs(inventory) << " units\n";
-    //         std::cout << "  Position Direction:    " << (inventory > 0 ? "LONG" : "SHORT") << "\n";
-    //         std::cout << "  Avg Entry Price:       $" << avg_entry_price << "\n";
-    //         double current_price = (matching_engine.getBestBid() + matching_engine.getBestAsk()) / 2.0;
-    //         std::cout << "  Current Market Price:  $" << current_price << "\n";
-    //         std::cout << "  Unrealized per unit:   $" << (inventory > 0 ? current_price - avg_entry_price : avg_entry_price - current_price) << "\n";
-            
-    //         std::cout << "\n============================================================\n";
-    //     }
-    // }
     void generateReport() const {
         if (portfolio_value.empty()) {
             std::cout << "No data to generate report.\n";
@@ -448,23 +351,15 @@ private:
                 uint64_t l2_ts = history_manager->getL2(current_l2_idx).timestamp;
                 uint64_t tr_ts = history_manager->getTrade(current_trade_idx).timestamp;
 
-                // ЛОГИРОВАНИЕ СРАВНЕНИЯ
-                // std::cout << "[Compare] LOB TS: " << l2_ts 
-                //         << " vs Trade TS: " << tr_ts;
-
                 if (l2_ts <= tr_ts) {
                     process_l2 = true;
-                    //std::cout << " -> Selecting LOB (LOB is earlier or equal)" << std::endl;
                 } else {
                     process_l2 = false;
-                    //std::cout << " -> Selecting TRADE (Trade is earlier)" << std::endl;
                 }
             } else if (has_l2) {
                 process_l2 = true;
-                //std::cout << "[Queue] Trades exhausted. Selecting LOB: " << l2_data[current_l2_idx].timestamp << std::endl;
             } else {
                 process_l2 = false;
-                //std::cout << "[Queue] LOB data exhausted. Selecting TRADE: " << trade_data[current_trade_idx].timestamp << std::endl;
             }
             
             if (process_l2) {
@@ -532,14 +427,14 @@ private:
 
                     auto l2 = matching_engine.fillL2Snapshot();
                     // Создаем контекст с текущим состоянием
-                    //MarketContext ctx{std::move(l2), inventory, cash, start_timestamp, current_timestamp };
+                    //MarketContext ctx{std::move(l2), inventory, cash, start_timestamp, current_timestamp };?
 
                     
                     if (collect && data_collector) {
-                        //data_collector->onMarketContext(ctx);
+                        //data_collector->onMarketContext(ctx);?
                     }
                     if (execute_strategy && strategy) {
-                        //strategy->onMarketContext(ctx, this);
+                        //strategy->onMarketContext(ctx, this);?
                     }
                 }
                 updatePortfolio();
@@ -593,58 +488,6 @@ private:
         total_sell_qty = 0.0;
         total_sell_value = 0.0;
     }
-
-    // void executeInnerTrade(const InnerTrade& trade) {
-    //     // Проверяем, участвовал ли наш ордер в сделке
-    //     auto role = trade.getOurRole();
-        
-    //     if (role == InnerTrade::OurRole::kAggressor || role == InnerTrade::OurRole::kPassive) {
-    //         Fill fill;
-    //         fill.timestamp = trade.timestamp;
-    //         fill.price = trade.price;
-    //         fill.amount = trade.amount;
-    //         fill.order_id = trade.getOurOrderId();
-    //         double trade_pnl = 0.0;  // PnL от этой сделки
-
-    //         // Определяем сторону нашего ордера
-    //         if (role == InnerTrade::OurRole::kAggressor) {
-    //             // Наш ордер был агрессивным (рыночным или лимитным, который пришел и снял ликвидность)
-    //             if (trade.side == TradeSide::kBuy) {
-    //                 fill.side = Side::kBid;
-    //                 inventory += trade.amount;
-    //                 cash -= trade.amount * trade.price;
-    //             } else {
-    //                 fill.side = Side::kAsk;
-    //                 inventory -= trade.amount;
-    //                 cash += trade.amount * trade.price;
-    //             }
-    //         } else {
-    //             // Наш ордер был пассивным (лимитным в книге)
-    //             if (trade.side == TradeSide::kBuy) {
-    //                 // Агрессор покупал -> мы продавали
-    //                 fill.side = Side::kAsk;
-    //                 inventory -= trade.amount;
-    //                 cash += trade.amount * trade.price;
-    //             } else {
-    //                 // Агрессор продавал -> мы покупали
-    //                 fill.side = Side::kBid;
-    //                 inventory += trade.amount;
-    //                 cash -= trade.amount * trade.price;
-    //             }
-    //         }
-            
-    //         fills.push_back(fill);
-    //         turnover += trade.amount * trade.price;
-    //         total_fills++;
-            
-    //         if (strategy) {
-    //             strategy->onFill(fill);
-    //         }
-    //         if (data_collector) {
-    //             data_collector->onFill(fill);
-    //         }
-    //     }
-    // }
 
     // Универсальный метод executeInnerTrade:
     void executeInnerTrade(const InnerTrade& trade) {
@@ -741,12 +584,6 @@ private:
             if (strategy) strategy->onFill(fill);
             if (data_collector) data_collector->onFill(fill);
             
-            // Логирование
-            // std::cout << "Trade: qty=" << fill.amount << ", price=" << fill.price 
-            //         << ", side=" << (fill.side == Side::kBid ? "BUY" : "SELL")
-            //         << ", trade_pnl=" << trade_pnl
-            //         << ", realized_pnl=" << realized_pnl
-            //         << ", inventory=" << inventory << std::endl;
         }
     }
 
@@ -776,25 +613,6 @@ private:
     }
 
     void updatePortfolio() {
-        // // Получаем текущие лучшие цены из matching engine
-        // double best_bid = matching_engine.getBestBid();
-        // double best_ask = matching_engine.getBestAsk();
-        
-        // // Если нет ликвидности, не обновляем статистику
-        // if (best_bid < kPriceEps || best_ask < kPriceEps) {
-        //     return;
-        // }
-        
-        // // Расчет mid price (средняя цена между бидом и аском)
-        // double mid_price = (best_bid + best_ask) / 2.0;
-        
-        // // Расчет текущей PnL (реализованная + нереализованная)
-        // // Нереализованная PnL = inventory * mid_price
-        // // Реализованная PnL уже в cash (относительно начального капитала)
-        // double current_pnl = cash + inventory * mid_price;
-        
-        // // Обновляем total_pnl для отчета
-        // total_pnl = current_pnl;
         double best_bid = matching_engine.getBestBid();
         double best_ask = matching_engine.getBestAsk();
         

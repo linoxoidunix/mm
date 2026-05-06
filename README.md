@@ -3,7 +3,7 @@
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://isocpp.org/)
 [![License](https://img.shields.io/badge/License-GPL-green.svg)](LICENSE)
 
-A high-performance backtesting framework for High-Frequency Trading strategies, implementing the Avellaneda-Stoikov (2008) market-making model with microprice extensions (2018).
+A backtesting framework for High-Frequency Trading strategies, implementing the Avellaneda-Stoikov (2008) market-making model with microprice extensions (2018).
 
 # Core Capabilities
 
@@ -90,6 +90,8 @@ The backtester generates comprehensive reports with the following metrics:
 | `final_inventory` | Final inventory position |
 | `avg_entry_price` | Average entry price across all fills |
 | `execution_time_ms` | Total simulation execution time in milliseconds |
+| `perfomamce` | Total simulation execution time in milliseconds per single event (trade or L2 update) |
+
 
 ## 🔧 Requirements
 
@@ -98,7 +100,7 @@ The backtester generates comprehensive reports with the following metrics:
 | **Compiler** | GCC 15+ |
 | **Build System** | CMake 3.31.11+ |
 | **Operating System** | Linux |
-| **Dependencies** | None (uses only C++23 standard library) |
+| **Dependencies** | ldd |
 | **Optional** | Google Test for unit tests |
 
 ## ⚙️ Building
@@ -132,8 +134,8 @@ scripts/download_data.sh
 Run the strategy on historical data with parameterized variables:
 
 ```bash
-cd build/examples/example4
-./example4 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+cd build/release/examples/example1
+./example1 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
 ```
 Results will be written to backtest_results_summary.csv
 
@@ -141,8 +143,8 @@ Results will be written to backtest_results_summary.csv
 Run the strategy on historical data with parameterized variables:
 
 ```bash
-cd build/examples/example6
-./example6 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+cd build/release/examples/example2
+./example2 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
 ```
 Results will be written to backtest_results_summary.csv
 

@@ -14,39 +14,45 @@ class AvellanedaStoikovClassicGmn : public IStrategy {
 private:
     ASParams params;
     double order_size;
-    
+    bool use_logging = false;
     mutable std::ofstream log_file;
     mutable bool log_initialized = false;
     mutable int log_counter = 0;
     const int LOG_INTERVAL = 100;
     
-    // void initLog() const {
-    //     if (!log_initialized) {
-    //         auto now = std::chrono::system_clock::now();
-    //         auto time_t = std::chrono::system_clock::to_time_t(now);
-    //         std::tm* tm = std::localtime(&time_t);
-    //         char filename[256];
-    //         std::strftime(filename, sizeof(filename), "classic_as_log_%Y%m%d_%H%M%S.csv", tm);
+    void initLog() const {
+        if (!log_initialized) {
+            auto now = std::chrono::system_clock::now();
+            auto time_t = std::chrono::system_clock::to_time_t(now);
+            std::tm* tm = std::localtime(&time_t);
+            char filename[256];
+            std::strftime(filename, sizeof(filename), "classic_as_log_%Y%m%d_%H%M%S.csv", tm);
             
-    //         log_file.open(filename);
-    //         if (log_file.is_open()) {
-    //             log_file << "timestamp,inv,best_bid,best_ask,market_mid,inventory_bias,reservation_price,"
-    //                     << "spread,spread_ticks,bid_quote,ask_quote,bid_dist,ask_dist,bid_send,ask_send\n";
-    //         }
-    //         log_initialized = true;
-    //     }
-    // }
+            log_file.open(filename);
+            if (log_file.is_open()) {
+                log_file << "timestamp,inv,best_bid,best_ask,market_mid,inventory_bias,reservation_price,"
+                        << "spread,spread_ticks,bid_quote,ask_quote,bid_dist,ask_dist,bid_send,ask_send\n";
+            }
+            log_initialized = true;
+        }
+    }
 
 public:
-    AvellanedaStoikovClassicGmn(ASParams p, double size) : params(p), order_size(size) {}
+    AvellanedaStoikovClassicGmn(ASParams p, double size, bool log_enabled = false) : 
+    params(p),
+    order_size(size),
+    use_logging(log_enabled) {}
     
     ~AvellanedaStoikovClassicGmn() {
-        if (log_file.is_open()) log_file.close();
+        if (log_file.is_open()){
+            log_file.close();
+        }
     }
 
     void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
         if (ctx.l2.bids.empty() || ctx.l2.asks.empty()) return;
-        //initLog();
+        
+        if (use_logging) initLog();
 
         const double tick_size = 0.0000001; 
         const double best_bid = ctx.l2.bids[0].first;
@@ -86,21 +92,21 @@ public:
         bool ask_valid = (ask_quote > best_bid);
 
         // Логирование
-        // if (++log_counter % LOG_INTERVAL == 0 && log_file.is_open()) {
-        //     log_file << ctx.current_timestamp << ","
-        //             << ctx.inventory << ","
-        //             << best_bid << "," << best_ask << ","
-        //             << mid_price << ","
-        //             << inventory_bias << ","
-        //             << reservation_price << ","
-        //             << optimal_spread << ","
-        //             << (optimal_spread / tick_size) << ","
-        //             << bid_quote << "," << ask_quote << ","
-        //             << (best_bid - bid_quote) / tick_size << ","
-        //             << (ask_quote - best_ask) / tick_size << ","
-        //             << (can_buy && bid_valid ? "YES" : "NO") << ","
-        //             << (can_sell && ask_valid ? "YES" : "NO") << "\n";
-        // }
+        if (use_logging && ++log_counter % LOG_INTERVAL == 0 && log_file.is_open()) {
+            log_file << ctx.current_timestamp << ","
+                    << ctx.inventory << ","
+                    << best_bid << "," << best_ask << ","
+                    << mid_price << ","
+                    << inventory_bias << ","
+                    << reservation_price << ","
+                    << optimal_spread << ","
+                    << (optimal_spread / tick_size) << ","
+                    << bid_quote << "," << ask_quote << ","
+                    << (best_bid - bid_quote) / tick_size << ","
+                    << (ask_quote - best_ask) / tick_size << ","
+                    << (can_buy && bid_valid ? "YES" : "NO") << ","
+                    << (can_sell && ask_valid ? "YES" : "NO") << "\n";
+        }
 
         // 7. Работа с ордерами
         api->cancelAll();

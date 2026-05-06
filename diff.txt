@@ -1,0 +1,3327 @@
+diff --git a/CMakePresets.json b/CMakePresets.json
+index be3f392..0907280 100644
+--- a/CMakePresets.json
++++ b/CMakePresets.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": 6,
++  "version": 11,
+   "configurePresets": [
+     {
+       "name": "default",
+@@ -9,7 +9,6 @@
+       "binaryDir": "${sourceDir}/build/default",
+       "cacheVariables": {
+         "CMAKE_BUILD_TYPE": "Debug",
+-        "CMAKE_CXX_STANDARD": 23,
+         "BUILD_TESTS_MM": "ON"
+       }
+     },
+@@ -21,7 +20,6 @@
+       "binaryDir": "${sourceDir}/build/release",
+       "cacheVariables": {
+         "CMAKE_BUILD_TYPE": "Release",
+-        "CMAKE_CXX_STANDARD": 23,
+         "BUILD_TESTS_MM": "ON",
+         "ENABLE_CLANG_TIDY": "OFF"
+       }
+@@ -34,7 +32,6 @@
+       "binaryDir": "${sourceDir}/build/release-tests",
+       "cacheVariables": {
+         "CMAKE_BUILD_TYPE": "Release",
+-        "CMAKE_CXX_STANDARD": 23,
+         "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native -mtune=native -flto=auto",
+         "CMAKE_EXE_LINKER_FLAGS_RELEASE": "-flto=auto",
+         "BUILD_TESTS_MM": "ON",
+@@ -49,7 +46,6 @@
+       "binaryDir": "${sourceDir}/build/relwithdebinfo-tests",
+       "cacheVariables": {
+         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+-        "CMAKE_CXX_STANDARD": 23,
+         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+         "BUILD_TESTS_MM": "ON",
+         "ENABLE_CLANG_TIDY": "OFF"
+@@ -89,7 +85,7 @@
+       "configuration": "Release",
+       "output": {
+         "outputOnFailure": true,
+-        "verbosity": "normal"
++        "verbosity": "default"
+       },
+       "execution": {
+         "noTestsAction": "error",
+@@ -116,25 +112,6 @@
+         "timeout": 600
+       }
+     },
+-    {
+-      "name": "release-specific-test",
+-      "displayName": "Run Specific Release Test",
+-      "description": "Run specific test in release mode (set TEST_NAME variable)",
+-      "configurePreset": "release-with-tests",
+-      "configuration": "Release",
+-      "output": {
+-        "outputOnFailure": true,
+-        "verbosity": "normal"
+-      },
+-      "execution": {
+-        "noTestsAction": "error"
+-      },
+-      "filter": {
+-        "include": {
+-          "name": "${TEST_NAME}"
+-        }
+-      }
+-    },
+     {
+       "name": "relwithdebinfo-tests",
+       "displayName": "Run RelWithDebInfo Tests",
+@@ -143,7 +120,7 @@
+       "configuration": "RelWithDebInfo",
+       "output": {
+         "outputOnFailure": true,
+-        "verbosity": "normal"
++        "verbosity": "default"
+       },
+       "execution": {
+         "noTestsAction": "error",
+diff --git a/README.md b/README.md
+index da1f98f..fde3a66 100644
+--- a/README.md
++++ b/README.md
+@@ -3,7 +3,7 @@
+ [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://isocpp.org/)
+ [![License](https://img.shields.io/badge/License-GPL-green.svg)](LICENSE)
+ 
+-A high-performance backtesting framework for High-Frequency Trading strategies, implementing the Avellaneda-Stoikov (2008) market-making model with microprice extensions (2018).
++A backtesting framework for High-Frequency Trading strategies, implementing the Avellaneda-Stoikov (2008) market-making model with microprice extensions (2018).
+ 
+ # Core Capabilities
+ 
+@@ -90,6 +90,8 @@ The backtester generates comprehensive reports with the following metrics:
+ | `final_inventory` | Final inventory position |
+ | `avg_entry_price` | Average entry price across all fills |
+ | `execution_time_ms` | Total simulation execution time in milliseconds |
++| `perfomamce` | Total simulation execution time in milliseconds per single event (trade or L2 update) |
++
+ 
+ ## 🔧 Requirements
+ 
+@@ -98,7 +100,7 @@ The backtester generates comprehensive reports with the following metrics:
+ | **Compiler** | GCC 15+ |
+ | **Build System** | CMake 3.31.11+ |
+ | **Operating System** | Linux |
+-| **Dependencies** | None (uses only C++23 standard library) |
++| **Dependencies** | ldd |
+ | **Optional** | Google Test for unit tests |
+ 
+ ## ⚙️ Building
+@@ -132,8 +134,8 @@ scripts/download_data.sh
+ Run the strategy on historical data with parameterized variables:
+ 
+ ```bash
+-cd build/examples/example4
+-./example4 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
++cd build/release/examples/example1
++./example1 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+ ```
+ Results will be written to backtest_results_summary.csv
+ 
+@@ -141,8 +143,8 @@ Results will be written to backtest_results_summary.csv
+ Run the strategy on historical data with parameterized variables:
+ 
+ ```bash
+-cd build/examples/example6
+-./example6 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
++cd build/release/examples/example2
++./example2 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+ ```
+ Results will be written to backtest_results_summary.csv
+ 
+diff --git a/examples/CMakeLists.txt b/examples/CMakeLists.txt
+index 2b4a449..053fac4 100644
+--- a/examples/CMakeLists.txt
++++ b/examples/CMakeLists.txt
+@@ -1,7 +1,3 @@
+ add_subdirectory(example1)
+ add_subdirectory(example2)
+-add_subdirectory(example3)
+-add_subdirectory(example4)
+-add_subdirectory(example5)
+-add_subdirectory(example6)
+-add_subdirectory(example7_debug)
+\ No newline at end of file
++add_subdirectory(example3)
+\ No newline at end of file
+diff --git a/examples/example1/CMakeLists.txt b/examples/example1/CMakeLists.txt
+index 086f839..1147e33 100644
+--- a/examples/example1/CMakeLists.txt
++++ b/examples/example1/CMakeLists.txt
+@@ -1,3 +1,4 @@
++
+ set (PROJECT_NAME example1)
+ project(${PROJECT_NAME})
+ 
+diff --git a/examples/example1/main.cpp b/examples/example1/main.cpp
+index 7eba50f..0eb2acf 100644
+--- a/examples/example1/main.cpp
++++ b/examples/example1/main.cpp
+@@ -3,76 +3,362 @@
+ #include <tuple>
+ #include <fstream>
+ #include <iomanip>
+-#include <filesystem>
++#include <thread>
++#include <future>
++#include <atomic>
+ 
+ #include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h"
+-
++#include "mm/history_manager/history_manager.h"
++#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h"
+ #include "mm/strategy/avelaneda_stoikov/config.h"
+ 
+-void createTestL2File(const std::string& filename, const std::vector<std::tuple<int64_t, 
+-                       std::vector<std::pair<double, double>>, 
+-                       std::vector<std::pair<double, double>>>>& snapshots) {
+-    std::ofstream file(filename);
+-    file << "row,timestamp,ask_price0,ask_vol0,bid_price0,bid_vol0";
+-    for (int i = 1; i < 25; i++) {
+-        file << ",ask_price" << i << ",ask_vol" << i << ",bid_price" << i << ",bid_vol" << i;
+-    }
+-    file << "\n";
+-    
+-    for (size_t idx = 0; idx < snapshots.size(); ++idx) {
+-        auto [ts, asks, bids] = snapshots[idx];
+-        file << idx + 1 << "," << ts << ",";
+-        
+-        for (int i = 0; i < 25; i++) {
+-            double ask_price = (i < (int)asks.size()) ? asks[i].first : 0.0;
+-            double ask_vol = (i < (int)asks.size()) ? asks[i].second : 0.0;
+-            double bid_price = (i < (int)bids.size()) ? bids[i].first : 0.0;
+-            double bid_vol = (i < (int)bids.size()) ? bids[i].second : 0.0;
+-            
+-            file << ask_price << "," << ask_vol << "," << bid_price << "," << bid_vol;
+-            if (i < 24) file << ",";
+-        }
+-        file << "\n";
++// Структура для хранения результатов одного прогона
++struct BacktestResult {
++    std::string name;
++    double gamma;
++    double kappa;
++    double sigma;
++    double order_size;
++    double max_inventory;
++    double final_equity;
++    double total_profit;
++    double realized_pnl;
++    double unrealized_pnl;
++    double turnover;
++    double fill_rate;
++    double max_drawdown;
++    int total_orders;
++    int total_fills;
++    double avg_inventory;
++    double final_inventory;
++    double avg_entry_price;
++    int64_t execution_time_ms;
++    double perfomance;// = execution_time_ms / history_manager.getTotalEvents
++};
++
++// Атомарные счетчики
++std::atomic<int> completed_count{0};
++std::atomic<int> total_count{0};
++
++// Функция для запуска одного бектеста
++BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
++                           const std::string& name, 
++                           double gamma, 
++                           double kappa, 
++                           double sigma,
++                           double order_size,
++                           double max_inventory) {
++    
++    auto start_time = std::chrono::high_resolution_clock::now();
++    
++    // Создаем бектестер с общим HistoryManager
++    HFTBacktesterConfig config;
++    config.cash = 7000.0;
++    config.inventory = 0.0;
++    HFTBacktester backtester(std::move(config), hm);
++    
++    // Настраиваем стратегию с учетом max_inventory
++    ASParams params = {gamma, kappa, sigma, 1.0, max_inventory};
++    auto strategy = std::make_unique<AvellanedaStoikovMicroPrice>(params, order_size);
++    backtester.setStrategy(std::move(strategy));
++    
++    // Запускаем стратегию
++    backtester.runStrategy();
++    
++    auto end_time = std::chrono::high_resolution_clock::now();
++    auto execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
++    
++    // Собираем результаты
++    BacktestResult result;
++    result.name = name;
++    result.gamma = gamma;
++    result.kappa = kappa;
++    result.sigma = sigma;
++    result.order_size = order_size;
++    result.max_inventory = max_inventory;
++    result.final_equity = backtester.getEquity();
++    result.total_profit = result.final_equity - 7000.0;
++    result.realized_pnl = backtester.getRealizedPnL();
++    result.unrealized_pnl = backtester.getUnrealizedPnL();
++    result.turnover = backtester.getTurnover();
++    result.total_orders = backtester.getTotalOrdersPlaced();
++    result.total_fills = backtester.getTotalFills();
++    result.fill_rate = (result.total_orders > 0) ? 
++                        (100.0 * result.total_fills / result.total_orders) : 0.0;
++    result.final_inventory = backtester.getInventory();
++    result.avg_entry_price = backtester.getAvgEntryPrice();
++    result.execution_time_ms = execution_time;
++    auto total_events = hm->getTotalEvents();
++    result.perfomance = total_events? result.execution_time_ms / hm->getTotalEvents() : 0;
++    
++    // Прогресс
++    int completed = ++completed_count;
++    int total = total_count.load();
++    
++    static std::atomic_flag cout_flag = ATOMIC_FLAG_INIT;
++    while (cout_flag.test_and_set(std::memory_order_acquire)) {
++        std::this_thread::yield();
+     }
+-    file.close();
++    
++    std::cout << "[" << completed << "/" << total << "] " 
++              << name << ": "
++              << "PnL=$" << result.total_profit
++              << " (realized=" << result.realized_pnl 
++              << ", unrealized=" << result.unrealized_pnl << ")"
++              << ", Fill=" << result.fill_rate << "%"
++              << ", MaxInv=" << max_inventory
++              << ", Time=" << execution_time << "ms" << std::endl;
++    
++    cout_flag.clear(std::memory_order_release);
++    
++    return result;
+ }
+ 
+-void createTestTradeFile(const std::string& filename, 
+-                         const std::vector<std::tuple<int64_t, TradeSide, double, double>>& trades) {
++// Сохранение результатов в CSV
++void saveResultsToCSV(const std::vector<BacktestResult>& results, const std::string& filename) {
+     std::ofstream file(filename);
+-    file << "row,timestamp,side,price,amount\n";
+-    for (size_t i = 0; i < trades.size(); ++i) {
+-        auto [ts, side, price, amount] = trades[i];
+-        file << i + 1 << "," << ts << ",";
+-        file << (side == TradeSide::kBuy ? "buy" : "sell") << ",";
+-        file << price << "," << amount << "\n";
++    if (!file.is_open()) {
++        std::cerr << "Cannot open file: " << filename << std::endl;
++        return;
++    }
++    
++    file << "name,gamma,kappa,sigma,order_size,max_inventory,final_equity,total_profit,"
++         << "realized_pnl,unrealized_pnl,turnover,total_orders,total_fills,fill_rate,"
++         << "final_inventory,avg_entry_price,execution_time_ms\n";
++    
++    for (const auto& r : results) {
++        file << r.name << ","
++             << r.gamma << ","
++             << r.kappa << ","
++             << r.sigma << ","
++             << r.order_size << ","
++             << r.max_inventory << ","
++             << r.final_equity << ","
++             << r.total_profit << ","
++             << r.realized_pnl << ","
++             << r.unrealized_pnl << ","
++             << r.turnover << ","
++             << r.total_orders << ","
++             << r.total_fills << ","
++             << r.fill_rate << ","
++             << r.final_inventory << ","
++             << r.avg_entry_price << ","
++             << r.execution_time_ms << "," 
++             << r.perfomance << "\n";
+     }
++    
+     file.close();
++    std::cout << "Results saved to: " << filename << std::endl;
+ }
+ 
+ int main(int argc, char* argv[]) {
+-    HFTBacktesterConfig config;
+-    HFTBacktester backtester(std::move(config));
++    std::cout << "\n";
++    std::cout << "╔═════════════════════════════════════════════════════════════════════╗\n";
++    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov MicroPrice 2018         ║\n";
++    std::cout << "║           Parameter Sweep - Parallel Testing                        ║\n";
++    std::cout << "╚═════════════════════════════════════════════════════════════════════╝\n";
++    
++    std::string l2_file = "../../../data/synced_lob.csv";
++    std::string trade_file = "../../../data/synced_trades.csv";
++    
++    if (argc >= 2) l2_file = argv[1];
++    if (argc >= 3) trade_file = argv[2];
+     
+-    std::vector<std::tuple<int64_t, std::vector<std::pair<double, double>>, std::vector<std::pair<double, double>>>> snapshots = {
+-        {1000, {{100.0, 100}}, {{99.5, 100}}},
+-        {2000, {{101.0, 150}}, {{100.0, 150}}}
++    // Загрузка данных
++    std::cout << "\nLoading L2 data..." << std::endl;
++    auto hm = std::make_shared<HistoryManager>();
++    hm->loadL2Data(l2_file);
++    std::cout << "Loading Trade data..." << std::endl;
++    hm->loadTradeData(trade_file);
++    std::cout << "Loaded " << hm->getL2Size() << " L2 snapshots and " 
++              << hm->getTradeSize() << " trades" << std::endl;
++    
++    std::vector<BacktestResult> results;
++    
++    // ============================================================
++    // ПАРАМЕТРЫ ДЛЯ ТЕСТИРОВАНИЯ
++    // ============================================================
++    
++    struct ParamSet {
++        std::string name;
++        double gamma;
++        double kappa;
++        double sigma;
++        double order_size;
++        double max_inventory;
+     };
+-    std::vector<std::tuple<int64_t, TradeSide, double, double>> trades = {
+-        {1500, TradeSide::kSell, 100.0, 50},
+-        {2500, TradeSide::kBuy, 101.0, 30}
++    
++    std::vector<ParamSet> all_params;
++    
++    double base_gamma = 0.5;
++    double base_kappa = 1000000.0;
++    double base_sigma = 0.0002;
++    double base_order_size = 50.0;
++    double base_max_inventory = 5000.0;
++    
++    // 1. Тестирование разных gamma
++    std::vector<double> gamma_values = {0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0};
++    for (double gamma : gamma_values) {
++        all_params.push_back({"gamma_" + std::to_string(gamma), gamma, base_kappa, base_sigma, base_order_size, base_max_inventory});
++    }
++    
++    // 2. Тестирование разных kappa
++    std::vector<double> kappa_values = {10000, 100000, 500000, 1000000, 5000000, 8000000, 10000000};
++    for (double kappa : kappa_values) {
++        all_params.push_back({"kappa_" + std::to_string(kappa), base_gamma, kappa, base_sigma, base_order_size, base_max_inventory});
++    }
++    
++    // 3. Тестирование разных sigma
++    std::vector<double> sigma_values = {0.0001, 0.0002, 0.0005, 0.001, 0.0015, 0.002, 0.005};
++    for (double sigma : sigma_values) {
++        all_params.push_back({"sigma_" + std::to_string(sigma), base_gamma, base_kappa, sigma, base_order_size, base_max_inventory});
++    }
++    
++    // 4. Тестирование разных размеров ордеров
++    std::vector<double> order_sizes = {10, 25, 50, 75, 100, 120, 150, 200, 500};
++    for (double size : order_sizes) {
++        all_params.push_back({"size_" + std::to_string(size), base_gamma, base_kappa, base_sigma, size, base_max_inventory});
++    }
++    
++    // 5. Тестирование разных max_inventory
++    std::vector<double> max_inventory_values = {1000, 2000, 3000, 4000, 5000, 7500, 10000};
++    for (double max_inv : max_inventory_values) {
++        all_params.push_back({"maxinv_" + std::to_string(max_inv), base_gamma, base_kappa, base_sigma, base_order_size, max_inv});
++    }
++    
++    // 6. Grid search - оптимальные комбинации (расширенная сетка)
++    std::vector<std::tuple<double, double, double, double, double>> grid_params = {
++        // gamma, kappa, sigma, order_size, max_inventory
++        {2.0, 5000000, 0.001, 100, 5000},
++        {3.0, 8000000, 0.0015, 120, 5000},
++        {2.5, 7000000, 0.0012, 110, 7500},
++        {1.5, 3000000, 0.0008, 80, 4000},
++        {4.0, 10000000, 0.002, 150, 10000},
++        {0.8, 2000000, 0.0005, 60, 3000},
++        {1.2, 4000000, 0.0007, 90, 6000},
++        {3.5, 9000000, 0.0018, 130, 8000},
++        // Более агрессивные настройки
++        {5.0, 12000000, 0.0025, 200, 15000},
++        {0.3, 1500000, 0.0003, 40, 2500},
++        {2.0, 6000000, 0.001, 100, 2000},
++        {4.0, 11000000, 0.001, 180, 12000}
+     };
+     
+-    createTestL2File("test_l2.csv", snapshots);
+-    createTestTradeFile("test_trade.csv", trades);
+-    backtester.loadL2Data("test_l2.csv");
+-    backtester.loadTradeData("test_trade.csv");
++    int idx = 1;
++    for (const auto& [g, k, s, sz, max_inv] : grid_params) {
++        all_params.push_back({"grid_" + std::to_string(idx++), g, k, s, sz, max_inv});
++    }
++    
++    // 7. Детальная сетка вокруг лучших параметров (grid_8: gamma=3, kappa=8e6, sigma=0.0015, size=120)
++    std::vector<double> fine_gamma = {2.5, 2.8, 3.0, 3.2, 3.5};
++    std::vector<double> fine_kappa = {7000000, 7500000, 8000000, 8500000, 9000000};
++    std::vector<double> fine_sigma = {0.0012, 0.0014, 0.0015, 0.0016, 0.0018};
++    std::vector<double> fine_sizes = {100, 110, 120, 130, 150};
++    std::vector<double> fine_maxinv = {4000, 5000, 6000, 8000, 10000};
++    
++    int fine_idx = 1;
++    for (double g : fine_gamma) {
++        all_params.push_back({"fine_gamma_" + std::to_string(fine_idx++), g, 8000000, 0.0015, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double k : fine_kappa) {
++        all_params.push_back({"fine_kappa_" + std::to_string(fine_idx++), 3.0, k, 0.0015, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double s : fine_sigma) {
++        all_params.push_back({"fine_sigma_" + std::to_string(fine_idx++), 3.0, 8000000, s, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double sz : fine_sizes) {
++        all_params.push_back({"fine_size_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, sz, 5000});
++    }
++    fine_idx = 1;
++    for (double max_inv : fine_maxinv) {
++        all_params.push_back({"fine_maxinv_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, 120, max_inv});
++    }
++    
++    total_count = all_params.size();
++    
++    std::cout << "\nTotal parameter sets: " << total_count.load() << std::endl;
++    std::cout << "Running in parallel (" << std::thread::hardware_concurrency() << " threads)...\n" << std::endl;
++    
++    // Параллельный запуск
++    auto start_total = std::chrono::high_resolution_clock::now();
++    
++    std::vector<std::future<BacktestResult>> futures;
++    for (const auto& p : all_params) {
++        futures.push_back(std::async(std::launch::async, runBacktest, hm, p.name, 
++                                      p.gamma, p.kappa, p.sigma, p.order_size, p.max_inventory));
++    }
++    
++    for (auto& f : futures) {
++        results.push_back(f.get());
++    }
++    
++    auto end_total = std::chrono::high_resolution_clock::now();
++    auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_total - start_total).count();
++    
++    // Сохранение результатов
++    saveResultsToCSV(results, "backtest_results_summary.csv");
++    
++    // Вывод лучших результатов
++    std::cout << "\n" << std::string(80, '=') << std::endl;
++    std::cout << "BEST RESULTS SUMMARY" << std::endl;
++    std::cout << std::string(80, '=') << std::endl;
++    
++    // Сортировка по прибыли
++    auto sorted_by_profit = results;
++    std::sort(sorted_by_profit.begin(), sorted_by_profit.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.total_profit > b.total_profit;
++        });
++    
++    std::cout << "\n🏆 TOP 10 BY TOTAL PROFIT:" << std::endl;
++    for (int i = 0; i < std::min(10, (int)sorted_by_profit.size()); ++i) {
++        const auto& r = sorted_by_profit[i];
++        std::cout << "   " << (i+1) << ". " << r.name 
++                  << " | Profit=$" << r.total_profit
++                  << " | Realized=$" << r.realized_pnl
++                  << " | Unrealized=$" << r.unrealized_pnl
++                  << " | Fill=" << r.fill_rate << "%"
++                  << " | Gamma=" << r.gamma
++                  << " | Kappa=" << r.kappa
++                  << " | Sigma=" << r.sigma
++                  << " | Size=" << r.order_size
++                  << " | MaxInv=" << r.max_inventory << std::endl;
++    }
++    
++    // Лучший по прибыли
++    auto best = sorted_by_profit[0];
++    std::cout << "\n🏆 BEST OVERALL: " << best.name << std::endl;
++    std::cout << "   gamma=" << best.gamma << ", kappa=" << best.kappa 
++              << ", sigma=" << best.sigma << ", size=" << best.order_size 
++              << ", max_inventory=" << best.max_inventory << std::endl;
++    std::cout << "   Profit=$" << best.total_profit 
++              << " (realized=" << best.realized_pnl 
++              << ", unrealized=" << best.unrealized_pnl << ")"
++              << ", Fill Rate=" << best.fill_rate << "%" << std::endl;
++    
++    // Лучший по fill rate
++    auto best_fill = std::max_element(results.begin(), results.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.fill_rate < b.fill_rate;
++        });
++    std::cout << "\n📈 BEST FILL RATE: " << best_fill->name << std::endl;
++    std::cout << "   Fill Rate=" << best_fill->fill_rate << "%, Profit=$" << best_fill->total_profit << std::endl;
++    
++    // Лучший по realized PnL
++    auto best_realized = std::max_element(results.begin(), results.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.realized_pnl < b.realized_pnl;
++        });
++    std::cout << "\n💵 BEST REALIZED PNL: " << best_realized->name << std::endl;
++    std::cout << "   Realized=$" << best_realized->realized_pnl << ", Profit=$" << best_realized->total_profit << std::endl;
+     
+-    auto state = backtester.collectData(1.0);
+-   
+-    std::filesystem::remove("test_l2.csv");
+-    std::filesystem::remove("test_trade.csv");
++    // Лучший по Sharpe
++    std::cout << "\n⏱️  Total execution time: " << total_time << " ms (" << total_time/1000 << " sec)" << std::endl;
++    std::cout << "   Average time per test: " << total_time / total_count.load() << " ms" << std::endl;
++    std::cout << "\nDone. Results saved to backtest_results_summary.csv\n";
+     
+     return 0;
+ }
+\ No newline at end of file
+diff --git a/examples/example2/main.cpp b/examples/example2/main.cpp
+index ae196d8..f1df8a1 100644
+--- a/examples/example2/main.cpp
++++ b/examples/example2/main.cpp
+@@ -1,75 +1,363 @@
+-// hft_backtester_complete.cpp
+-// Complete HFT Backtester for CMF Entrance Exam
+-// Implements Avellaneda-Stoikov (2008) with microprice extension (2018)
+-
+ #include <iostream>
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h"
++#include <vector>
++#include <tuple>
++#include <fstream>
++#include <iomanip>
++#include <thread>
++#include <future>
++#include <atomic>
+ 
++#include "mm/hftbacktester/hftbacktester.h"
++#include "mm/history_manager/history_manager.h"
++#include "mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h"
+ #include "mm/strategy/avelaneda_stoikov/config.h"
+-// ==============================
+-// Main Function
+-// ==============================
++
++// Структура для хранения результатов одного прогона
++struct BacktestResult {
++    std::string name;
++    double gamma;
++    double kappa;
++    double sigma;
++    double order_size;
++    double max_inventory;
++    double final_equity;
++    double total_profit;
++    double realized_pnl;
++    double unrealized_pnl;
++    double turnover;
++    double fill_rate;
++    double max_drawdown;
++    int total_orders;
++    int total_fills;
++    double avg_inventory;
++    double final_inventory;
++    double avg_entry_price;
++    int64_t execution_time_ms;
++    double perfomance;
++};
++
++// Атомарные счетчики
++std::atomic<int> completed_count{0};
++std::atomic<int> total_count{0};
++
++// Функция для запуска одного бектеста
++BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
++                           const std::string& name, 
++                           double gamma, 
++                           double kappa, 
++                           double sigma,
++                           double order_size,
++                           double max_inventory) {
++    
++    auto start_time = std::chrono::high_resolution_clock::now();
++    
++    // Создаем бектестер с общим HistoryManager
++    HFTBacktesterConfig config;
++    config.cash = 7000.0;
++    config.inventory = 0.0;
++    HFTBacktester backtester(std::move(config), hm);
++    
++    // Настраиваем стратегию с учетом max_inventory
++    ASParams params = {gamma, kappa, sigma, 1.0, max_inventory};
++    auto strategy = std::make_unique<AvellanedaStoikovClassicGmn>(params, order_size);
++    backtester.setStrategy(std::move(strategy));
++    
++    // Запускаем стратегию
++    backtester.runStrategy();
++    
++    auto end_time = std::chrono::high_resolution_clock::now();
++    auto execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
++    
++    // Собираем результаты
++    BacktestResult result;
++    result.name = name;
++    result.gamma = gamma;
++    result.kappa = kappa;
++    result.sigma = sigma;
++    result.order_size = order_size;
++    result.max_inventory = max_inventory;
++    result.final_equity = backtester.getEquity();
++    result.total_profit = result.final_equity - 7000.0;
++    result.realized_pnl = backtester.getRealizedPnL();
++    result.unrealized_pnl = backtester.getUnrealizedPnL();
++    result.turnover = backtester.getTurnover();
++    result.total_orders = backtester.getTotalOrdersPlaced();
++    result.total_fills = backtester.getTotalFills();
++    result.fill_rate = (result.total_orders > 0) ? 
++                        (100.0 * result.total_fills / result.total_orders) : 0.0;
++    result.final_inventory = backtester.getInventory();
++    result.avg_entry_price = backtester.getAvgEntryPrice();
++    result.execution_time_ms = execution_time;
++    auto total_events = hm->getTotalEvents();
++    result.perfomance = total_events? result.execution_time_ms / hm->getTotalEvents() : 0;
++    // Прогресс
++    int completed = ++completed_count;
++    int total = total_count.load();
++    
++    static std::atomic_flag cout_flag = ATOMIC_FLAG_INIT;
++    while (cout_flag.test_and_set(std::memory_order_acquire)) {
++        std::this_thread::yield();
++    }
++    
++    std::cout << "[" << completed << "/" << total << "] " 
++              << name << ": "
++              << "PnL=$" << result.total_profit
++              << " (realized=" << result.realized_pnl 
++              << ", unrealized=" << result.unrealized_pnl << ")"
++              << ", Fill=" << result.fill_rate << "%"
++              << ", MaxInv=" << max_inventory
++              << ", Time=" << execution_time << "ms" << std::endl;
++    
++    cout_flag.clear(std::memory_order_release);
++    
++    return result;
++}
++
++// Сохранение результатов в CSV
++void saveResultsToCSV(const std::vector<BacktestResult>& results, const std::string& filename) {
++    std::ofstream file(filename);
++    if (!file.is_open()) {
++        std::cerr << "Cannot open file: " << filename << std::endl;
++        return;
++    }
++    
++    file << "name,gamma,kappa,sigma,order_size,max_inventory,final_equity,total_profit,"
++         << "realized_pnl,unrealized_pnl,turnover,total_orders,total_fills,fill_rate,"
++         << "final_inventory,avg_entry_price,execution_time_ms\n";
++    
++    for (const auto& r : results) {
++        file << r.name << ","
++             << r.gamma << ","
++             << r.kappa << ","
++             << r.sigma << ","
++             << r.order_size << ","
++             << r.max_inventory << ","
++             << r.final_equity << ","
++             << r.total_profit << ","
++             << r.realized_pnl << ","
++             << r.unrealized_pnl << ","
++             << r.turnover << ","
++             << r.total_orders << ","
++             << r.total_fills << ","
++             << r.fill_rate << ","
++             << r.final_inventory << ","
++             << r.avg_entry_price << ","
++             << r.execution_time_ms << ","
++             << r.perfomance << "\n";
++    }
++    
++    file.close();
++    std::cout << "Results saved to: " << filename << std::endl;
++}
+ 
+ int main(int argc, char* argv[]) {
+     std::cout << "\n";
+     std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+-    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov 2008/2018    ║\n";
+-    std::cout << "║           Advanced Quantitative Analytics Program        ║\n";
++    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov 2008         ║\n";
++    std::cout << "║           Parameter Sweep - Parallel Testing             ║\n";
+     std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+     
+-    // Default file names
+     std::string l2_file = "../../../data/synced_lob.csv";
+     std::string trade_file = "../../../data/synced_trades.csv";
+     
+-    double gamma = 0.5;
+-    double kappa = 8000000;
+-    double sigma = 0.0002;
+-    // double gamma = 0.1;      // Низкая риск-аверсность (позволяет большие позиции)
+-    // double kappa = 1000.0;   // Умеренный спред
+-    // double sigma = 0.001;
+-    // Override from command line if provided
+     if (argc >= 2) l2_file = argv[1];
+     if (argc >= 3) trade_file = argv[2];
+-    try {
+-        if (argc >= 4) gamma = std::stod(argv[3]);
+-        if (argc >= 5) kappa = std::stod(argv[4]);
+-        if (argc >= 6) sigma = std::stod(argv[5]);
+-    } catch (const std::exception& e) {
+-        std::cerr << "Error parsing numeric arguments: " << e.what() << std::endl;
+-        return 1;
++    
++    // Загрузка данных
++    std::cout << "\nLoading L2 data..." << std::endl;
++    auto hm = std::make_shared<HistoryManager>();
++    hm->loadL2Data(l2_file);
++    std::cout << "Loading Trade data..." << std::endl;
++    hm->loadTradeData(trade_file);
++    std::cout << "Loaded " << hm->getL2Size() << " L2 snapshots and " 
++              << hm->getTradeSize() << " trades" << std::endl;
++    
++    std::vector<BacktestResult> results;
++    
++    // ============================================================
++    // ПАРАМЕТРЫ ДЛЯ ТЕСТИРОВАНИЯ
++    // ============================================================
++    
++    struct ParamSet {
++        std::string name;
++        double gamma;
++        double kappa;
++        double sigma;
++        double order_size;
++        double max_inventory;
++    };
++    
++    std::vector<ParamSet> all_params;
++    
++    double base_gamma = 0.5;
++    double base_kappa = 1000000.0;
++    double base_sigma = 0.0002;
++    double base_order_size = 50.0;
++    double base_max_inventory = 5000.0;
++    
++    // 1. Тестирование разных gamma
++    std::vector<double> gamma_values = {0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0};
++    for (double gamma : gamma_values) {
++        all_params.push_back({"gamma_" + std::to_string(gamma), gamma, base_kappa, base_sigma, base_order_size, base_max_inventory});
+     }
+-
+-    HFTBacktesterConfig backtester_config;
+-    // Create backtester instance
+-    HFTBacktester backtester(std::move(backtester_config));
+-    ASParams config = {
+-        gamma,          // gamma: не трогаем
+-        kappa,      // kappa: 
+-                    // Это сузит Model Spread до разумных пределов.
+-        sigma,       // sigma: 
+-                    // Это должно наконец дать "Inv Risk" > 0 в логах.
+-        1.0,          
+-        5000.0        
++    
++    // 2. Тестирование разных kappa
++    std::vector<double> kappa_values = {10000, 100000, 500000, 1000000, 5000000, 8000000, 10000000};
++    for (double kappa : kappa_values) {
++        all_params.push_back({"kappa_" + std::to_string(kappa), base_gamma, kappa, base_sigma, base_order_size, base_max_inventory});
++    }
++    
++    // 3. Тестирование разных sigma
++    std::vector<double> sigma_values = {0.0001, 0.0002, 0.0005, 0.001, 0.0015, 0.002, 0.005};
++    for (double sigma : sigma_values) {
++        all_params.push_back({"sigma_" + std::to_string(sigma), base_gamma, base_kappa, sigma, base_order_size, base_max_inventory});
++    }
++    
++    // 4. Тестирование разных размеров ордеров
++    std::vector<double> order_sizes = {10, 25, 50, 75, 100, 120, 150, 200, 500};
++    for (double size : order_sizes) {
++        all_params.push_back({"size_" + std::to_string(size), base_gamma, base_kappa, base_sigma, size, base_max_inventory});
++    }
++    
++    // 5. Тестирование разных max_inventory
++    std::vector<double> max_inventory_values = {1000, 2000, 3000, 4000, 5000, 7500, 10000};
++    for (double max_inv : max_inventory_values) {
++        all_params.push_back({"maxinv_" + std::to_string(max_inv), base_gamma, base_kappa, base_sigma, base_order_size, max_inv});
++    }
++    
++    // 6. Grid search - оптимальные комбинации (расширенная сетка)
++    std::vector<std::tuple<double, double, double, double, double>> grid_params = {
++        // gamma, kappa, sigma, order_size, max_inventory
++        {2.0, 5000000, 0.001, 100, 5000},
++        {3.0, 8000000, 0.0015, 120, 5000},
++        {2.5, 7000000, 0.0012, 110, 7500},
++        {1.5, 3000000, 0.0008, 80, 4000},
++        {4.0, 10000000, 0.002, 150, 10000},
++        {0.8, 2000000, 0.0005, 60, 3000},
++        {1.2, 4000000, 0.0007, 90, 6000},
++        {3.5, 9000000, 0.0018, 130, 8000},
++        // Более агрессивные настройки
++        {5.0, 12000000, 0.0025, 200, 15000},
++        {0.3, 1500000, 0.0003, 40, 2500},
++        {2.0, 6000000, 0.001, 100, 2000},
++        {4.0, 11000000, 0.001, 180, 12000}
+     };
+-    auto strategy = std::make_unique<AvellanedaStoikov1>(config, 50.0);
+-    backtester.setStrategy(std::move(strategy));
+     
++    int idx = 1;
++    for (const auto& [g, k, s, sz, max_inv] : grid_params) {
++        all_params.push_back({"grid_" + std::to_string(idx++), g, k, s, sz, max_inv});
++    }
+     
+-    // Load data
+-    std::cout << "\nLoading data...\n";
+-    backtester.loadL2Data(l2_file);
+-    backtester.loadTradeData(trade_file);
++    // 7. Детальная сетка вокруг лучших параметров (grid_8: gamma=3, kappa=8e6, sigma=0.0015, size=120)
++    std::vector<double> fine_gamma = {2.5, 2.8, 3.0, 3.2, 3.5};
++    std::vector<double> fine_kappa = {7000000, 7500000, 8000000, 8500000, 9000000};
++    std::vector<double> fine_sigma = {0.0012, 0.0014, 0.0015, 0.0016, 0.0018};
++    std::vector<double> fine_sizes = {100, 110, 120, 130, 150};
++    std::vector<double> fine_maxinv = {4000, 5000, 6000, 8000, 10000};
+     
+-    // Run simulation
+-    backtester.runStrategy();
++    int fine_idx = 1;
++    for (double g : fine_gamma) {
++        all_params.push_back({"fine_gamma_" + std::to_string(fine_idx++), g, 8000000, 0.0015, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double k : fine_kappa) {
++        all_params.push_back({"fine_kappa_" + std::to_string(fine_idx++), 3.0, k, 0.0015, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double s : fine_sigma) {
++        all_params.push_back({"fine_sigma_" + std::to_string(fine_idx++), 3.0, 8000000, s, 120, 5000});
++    }
++    fine_idx = 1;
++    for (double sz : fine_sizes) {
++        all_params.push_back({"fine_size_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, sz, 5000});
++    }
++    fine_idx = 1;
++    for (double max_inv : fine_maxinv) {
++        all_params.push_back({"fine_maxinv_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, 120, max_inv});
++    }
++    
++    total_count = all_params.size();
++    
++    std::cout << "\nTotal parameter sets: " << total_count.load() << std::endl;
++    std::cout << "Running in parallel (" << std::thread::hardware_concurrency() << " threads)...\n" << std::endl;
++    
++    // Параллельный запуск
++    auto start_total = std::chrono::high_resolution_clock::now();
++    
++    std::vector<std::future<BacktestResult>> futures;
++    for (const auto& p : all_params) {
++        futures.push_back(std::async(std::launch::async, runBacktest, hm, p.name, 
++                                      p.gamma, p.kappa, p.sigma, p.order_size, p.max_inventory));
++    }
++    
++    for (auto& f : futures) {
++        results.push_back(f.get());
++    }
++    
++    auto end_total = std::chrono::high_resolution_clock::now();
++    auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_total - start_total).count();
++    
++    // Сохранение результатов
++    saveResultsToCSV(results, "backtest_results_summary.csv");
++    
++    // Вывод лучших результатов
++    std::cout << "\n" << std::string(80, '=') << std::endl;
++    std::cout << "BEST RESULTS SUMMARY" << std::endl;
++    std::cout << std::string(80, '=') << std::endl;
++    
++    // Сортировка по прибыли
++    auto sorted_by_profit = results;
++    std::sort(sorted_by_profit.begin(), sorted_by_profit.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.total_profit > b.total_profit;
++        });
++    
++    std::cout << "\n🏆 TOP 10 BY TOTAL PROFIT:" << std::endl;
++    for (int i = 0; i < std::min(10, (int)sorted_by_profit.size()); ++i) {
++        const auto& r = sorted_by_profit[i];
++        std::cout << "   " << (i+1) << ". " << r.name 
++                  << " | Profit=$" << r.total_profit
++                  << " | Realized=$" << r.realized_pnl
++                  << " | Unrealized=$" << r.unrealized_pnl
++                  << " | Fill=" << r.fill_rate << "%"
++                  << " | Gamma=" << r.gamma
++                  << " | Kappa=" << r.kappa
++                  << " | Sigma=" << r.sigma
++                  << " | Size=" << r.order_size
++                  << " | MaxInv=" << r.max_inventory << std::endl;
++    }
++    
++    // Лучший по прибыли
++    auto best = sorted_by_profit[0];
++    std::cout << "\n🏆 BEST OVERALL: " << best.name << std::endl;
++    std::cout << "   gamma=" << best.gamma << ", kappa=" << best.kappa 
++              << ", sigma=" << best.sigma << ", size=" << best.order_size 
++              << ", max_inventory=" << best.max_inventory << std::endl;
++    std::cout << "   Profit=$" << best.total_profit 
++              << " (realized=" << best.realized_pnl 
++              << ", unrealized=" << best.unrealized_pnl << ")"
++              << ", Fill Rate=" << best.fill_rate << "%" << std::endl;
++    
++    // Лучший по fill rate
++    auto best_fill = std::max_element(results.begin(), results.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.fill_rate < b.fill_rate;
++        });
++    std::cout << "\n📈 BEST FILL RATE: " << best_fill->name << std::endl;
++    std::cout << "   Fill Rate=" << best_fill->fill_rate << "%, Profit=$" << best_fill->total_profit << std::endl;
+     
+-    // Generate reports
+-    backtester.generateReport();
+-    // backtester.exportResults("backtest_results.csv");
+-    // backtester.exportFills("fills.csv");
++    // Лучший по realized PnL
++    auto best_realized = std::max_element(results.begin(), results.end(),
++        [](const BacktestResult& a, const BacktestResult& b) {
++            return a.realized_pnl < b.realized_pnl;
++        });
++    std::cout << "\n💵 BEST REALIZED PNL: " << best_realized->name << std::endl;
++    std::cout << "   Realized=$" << best_realized->realized_pnl << ", Profit=$" << best_realized->total_profit << std::endl;
+     
+-    std::cout << "\nDone.\n";
++    // Лучший по Sharpe
++    std::cout << "\n⏱️  Total execution time: " << total_time << " ms (" << total_time/1000 << " sec)" << std::endl;
++    std::cout << "   Average time per test: " << total_time / total_count.load() << " ms" << std::endl;
++    std::cout << "\nDone. Results saved to backtest_results_summary.csv\n";
+     
+     return 0;
+ }
+\ No newline at end of file
+diff --git a/examples/example3/main.cpp b/examples/example3/main.cpp
+index 3160f8e..141351d 100644
+--- a/examples/example3/main.cpp
++++ b/examples/example3/main.cpp
+@@ -1,234 +1,75 @@
+-#include <iostream>
+-#include <vector>
+-#include <tuple>
+-#include <fstream>
+-#include <iomanip>
++// hft_backtester_complete.cpp
++// Complete HFT Backtester for CMF Entrance Exam
++// Implements Avellaneda-Stoikov (2008) with microprice extension (2018)
+ 
++#include <iostream>
+ #include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h"
++#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h"
+ 
+ #include "mm/strategy/avelaneda_stoikov/config.h"
+-
+-// Структура для хранения результатов одного прогона
+-struct BacktestResult {
+-    std::string name;
+-    double gamma;
+-    double kappa;
+-    double sigma;
+-    double order_size;
+-    double final_equity;
+-    double turnover;
+-    double fill_rate;
+-    double max_drawdown;
+-    double sharpe;
+-    int total_orders;
+-    int total_fills;
+-    double avg_inventory;
+-};
+-
+-// Функция для запуска одного бектеста с заданными параметрами
+-BacktestResult runBacktest(HFTBacktester& backtester,
+-                           const std::string& name, 
+-                           double gamma, 
+-                           double kappa, 
+-                           double sigma,
+-                           double order_size,
+-                           const std::string& l2_file,
+-                           const std::string& trade_file) {
+-    
+-    std::cout << "\n" << std::string(60, '=') << std::endl;
+-    std::cout << "Running: " << name << std::endl;
+-    std::cout << "  gamma=" << gamma << ", kappa=" << kappa 
+-              << ", sigma=" << sigma << ", order_size=" << order_size << std::endl;
+-    std::cout << std::string(60, '=') << std::endl;
+-    
+-    //HFTBacktesterConfig backtester_config;
+-    //HFTBacktester backtester(std::move(backtester_config));
+-    
+-    ASParams config = {gamma, kappa, sigma, 1.0, 5000.0};
+-    auto strategy = std::make_unique<AvellanedaStoikov1>(config, order_size);
+-    backtester.setStrategy(std::move(strategy));
+-    
+-    //backtester.loadL2Data(l2_file);
+-    //backtester.loadTradeData(trade_file);
+-    
+-    backtester.runStrategy();
+-    
+-    // Собираем результаты (нужно добавить геттеры в HFTBacktester)
+-    BacktestResult result;
+-    result.name = name;
+-    result.gamma = gamma;
+-    result.kappa = kappa;
+-    result.sigma = sigma;
+-    result.order_size = order_size;
+-    result.final_equity = backtester.getEquity();
+-    result.turnover = backtester.getTurnover();
+-    result.total_orders = backtester.getTotalOrdersPlaced();
+-    result.total_fills = backtester.getTotalFills();
+-    result.fill_rate = (result.total_orders > 0) ? 
+-                        (100.0 * result.total_fills / result.total_orders) : 0.0;
+-    
+-    // Эти метрики нужно добавить в HFTBacktester
+-    // result.max_drawdown = backtester.getMaxDrawdown();
+-    // result.sharpe = backtester.getSharpeRatio();
+-    // result.avg_inventory = backtester.getAvgInventory();
+-    
+-    return result;
+-}
+-
+-// Функция для сохранения результатов в CSV
+-void saveResultsToCSV(const std::vector<BacktestResult>& results, const std::string& filename) {
+-    std::ofstream file(filename);
+-    if (!file.is_open()) {
+-        std::cerr << "Cannot open file: " << filename << std::endl;
+-        return;
+-    }
+-    
+-    // Заголовки
+-    file << "name,gamma,kappa,sigma,order_size,final_pnl,turnover,total_orders,total_fills,fill_rate\n";
+-    
+-    // Данные
+-    for (const auto& r : results) {
+-        file << r.name << ","
+-             << r.gamma << ","
+-             << r.kappa << ","
+-             << r.sigma << ","
+-             << r.order_size << ","
+-             << r.final_equity << ","
+-             << r.turnover << ","
+-             << r.total_orders << ","
+-             << r.total_fills << ","
+-             << r.fill_rate << "\n";
+-    }
+-    
+-    file.close();
+-    std::cout << "Results saved to: " << filename << std::endl;
+-}
++// ==============================
++// Main Function
++// ==============================
+ 
+ int main(int argc, char* argv[]) {
+     std::cout << "\n";
+     std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+     std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov 2008/2018    ║\n";
+-    std::cout << "║           Parameter Sweep - Batch Testing                ║\n";
++    std::cout << "║           Advanced Quantitative Analytics Program        ║\n";
+     std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+     
+     // Default file names
+     std::string l2_file = "../../../data/synced_lob.csv";
+     std::string trade_file = "../../../data/synced_trades.csv";
+     
+-    // Override from command line
++    double gamma = 0.5;
++    double kappa = 1000000;
++    double sigma = 0.0005;
++    // double gamma = 0.1;      // Низкая риск-аверсность (позволяет большие позиции)
++    // double kappa = 1000.0;   // Умеренный спред
++    // double sigma = 0.001;
++    // Override from command line if provided
+     if (argc >= 2) l2_file = argv[1];
+     if (argc >= 3) trade_file = argv[2];
+-    
+-    std::vector<BacktestResult> results;
++    try {
++        if (argc >= 4) gamma = std::stod(argv[3]);
++        if (argc >= 5) kappa = std::stod(argv[4]);
++        if (argc >= 6) sigma = std::stod(argv[5]);
++    } catch (const std::exception& e) {
++        std::cerr << "Error parsing numeric arguments: " << e.what() << std::endl;
++        return 1;
++    }
+ 
+     HFTBacktesterConfig backtester_config;
++    // Create backtester instance
+     HFTBacktester backtester(std::move(backtester_config));
+-       
+-    backtester.loadL2Data(l2_file);
+-    backtester.loadTradeData(trade_file);
+-    
+-    // ============================================================
+-    // ПАРАМЕТРЫ ДЛЯ ТЕСТИРОВАНИЯ
+-    // ============================================================
+-    
+-    // 1. Тестирование разных gamma (риск-аверсность)
+-    std::vector<double> gamma_values = {0.1, 0.5, 1.0, 2.0, 5.0, 10.0};
+-    double base_kappa = 1000000.0;
+-    double base_sigma = 0.0002;
+-    double base_order_size = 50.0;
+-    
+-    std::cout << "\n=== Testing different gamma values ===" << std::endl;
+-    for (double gamma : gamma_values) {
+-        std::string name = "gamma_" + std::to_string(gamma);
+-        auto result = runBacktest(backtester, name, gamma, base_kappa, base_sigma, base_order_size, l2_file, trade_file);
+-        results.push_back(result);
+-    }
+-    
+-    // 2. Тестирование разных kappa (интенсивность заявок)
+-    std::vector<double> kappa_values = {10000, 100000, 500000, 1000000, 5000000, 10000000};
+-    double base_gamma = 0.5;
+-    
+-    std::cout << "\n=== Testing different kappa values ===" << std::endl;
+-    for (double kappa : kappa_values) {
+-        std::string name = "kappa_" + std::to_string(kappa);
+-        auto result = runBacktest(backtester, name, base_gamma, kappa, base_sigma, base_order_size, l2_file, trade_file);
+-        results.push_back(result);
+-    }
+-    
+-    // 3. Тестирование разных sigma (волатильность)
+-    std::vector<double> sigma_values = {0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005};
+-    
+-    std::cout << "\n=== Testing different sigma values ===" << std::endl;
+-    for (double sigma : sigma_values) {
+-        std::string name = "sigma_" + std::to_string(sigma);
+-        auto result = runBacktest(backtester, name, base_gamma, base_kappa, sigma, base_order_size, l2_file, trade_file);
+-        results.push_back(result);
+-    }
+-    
+-    // 4. Тестирование разных размеров ордеров
+-    std::vector<double> order_sizes = {10, 25, 50, 100, 200, 500};
+-    
+-    std::cout << "\n=== Testing different order sizes ===" << std::endl;
+-    for (double size : order_sizes) {
+-        std::string name = "size_" + std::to_string(size);
+-        auto result = runBacktest(backtester, name, base_gamma, base_kappa, base_sigma, size, l2_file, trade_file);
+-        results.push_back(result);
+-    }
+-    
+-    // 5. Оптимальные комбинации (grid search)
+-    std::vector<std::tuple<double, double, double, double>> grid_params = {
+-        {0.2, 500000, 0.0002, 30},
+-        {0.5, 1000000, 0.0003, 50},
+-        {1.0, 2000000, 0.0005, 75},
+-        {2.0, 5000000, 0.001, 100},
+-        {0.3, 750000, 0.00025, 40},
+-        {0.7, 1500000, 0.0004, 60},
+-        {1.5, 3000000, 0.0008, 80},
+-        {3.0, 8000000, 0.0015, 120}
++    ASParams config = {
++        gamma,          // gamma: не трогаем
++        kappa,      // kappa: 
++                    // Это сузит Model Spread до разумных пределов.
++        sigma,       // sigma: 
++                    // Это должно наконец дать "Inv Risk" > 0 в логах.
++        1.0,          
++        5000.0        
+     };
++    auto strategy = std::make_unique<AvellanedaStoikovMicroPrice>(config, 50.0);
++    backtester.setStrategy(std::move(strategy));
+     
+-    std::cout << "\n=== Grid search - optimal combinations ===" << std::endl;
+-    int idx = 1;
+-    for (const auto& [g, k, s, sz] : grid_params) {
+-        std::string name = "grid_" + std::to_string(idx++);
+-        auto result = runBacktest(backtester, name, g, k, s, sz, l2_file, trade_file);
+-        results.push_back(result);
+-    }
+-    
+-    // Сохранение результатов
+-    saveResultsToCSV(results, "backtest_results_summary.csv");
+-    
+-    // Вывод лучших результатов
+-    std::cout << "\n" << std::string(80, '=') << std::endl;
+-    std::cout << "BEST RESULTS SUMMARY" << std::endl;
+-    std::cout << std::string(80, '=') << std::endl;
+-    
+-    // Находим лучший по PnL
+-    auto best_pnl = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.final_equity < b.final_equity;
+-        });
+-    
+-    // Находим лучший по fill rate
+-    auto best_fill = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.fill_rate < b.fill_rate;
+-        });
+     
+-    // Находим лучший по Sharpe (если есть)
++    // Load data
++    std::cout << "\nLoading data...\n";
++    backtester.loadL2Data(l2_file);
++    backtester.loadTradeData(trade_file);
+     
+-    std::cout << "\n🏆 Best PnL: " << best_pnl->name << std::endl;
+-    std::cout << "   gamma=" << best_pnl->gamma << ", kappa=" << best_pnl->kappa 
+-              << ", sigma=" << best_pnl->sigma << ", size=" << best_pnl->order_size << std::endl;
+-    std::cout << "   PnL=$" << best_pnl->final_equity << ", Fill Rate=" << best_pnl->fill_rate << "%" << std::endl;
++    // Run simulation
++    backtester.runStrategy();
+     
+-    std::cout << "\n📈 Best Fill Rate: " << best_fill->name << std::endl;
+-    std::cout << "   gamma=" << best_fill->gamma << ", kappa=" << best_fill->kappa 
+-              << ", sigma=" << best_fill->sigma << ", size=" << best_fill->order_size << std::endl;
+-    std::cout << "   Fill Rate=" << best_fill->fill_rate << "%, PnL=$" << best_fill->final_equity << std::endl;
++    // Generate reports
++    backtester.generateReport();
++    // backtester.exportResults("backtest_results.csv");
++    // backtester.exportFills("fills.csv");
+     
+-    std::cout << "\nDone. Results saved to backtest_results_summary.csv\n";
++    std::cout << "\nDone.\n";
+     
+     return 0;
+ }
+\ No newline at end of file
+diff --git a/examples/example4/CMakeLists.txt b/examples/example4/CMakeLists.txt
+deleted file mode 100644
+index abe3ea3..0000000
+--- a/examples/example4/CMakeLists.txt
++++ /dev/null
+@@ -1,37 +0,0 @@
+-
+-set (PROJECT_NAME example4)
+-project(${PROJECT_NAME})
+-
+-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+-SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+-
+-file(GLOB SRC
+-     "*.cpp"
+-)
+-
+-
+-add_executable (${PROJECT_NAME}
+-    ${SRC}
+-)
+-
+-target_link_libraries(${PROJECT_NAME}
+-mm
+-)
+-
+-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+-set_target_properties(${PROJECT_NAME} PROPERTIES
+-    CXX_SCAN_FOR_MODULES OFF
+-    CXX_MODULE_STD_ONLY OFF
+-)
+-# Запрещаем CMake добавлять флаги модулей
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API OFF)
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 0)
+-
+-option(ENABLE_SANITIZERS "Enable AddressSanitizer and LeakSanitizer" ON)
+-
+-if (ENABLE_SANITIZERS)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,leak -fno-omit-frame-pointer -g")
+-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,leak")
+-endif()
+\ No newline at end of file
+diff --git a/examples/example4/README.md b/examples/example4/README.md
+deleted file mode 100644
+index 94fd2ff..0000000
+--- a/examples/example4/README.md
++++ /dev/null
+@@ -1 +0,0 @@
+-Запуск авеланеды штоикова микропрайс gmn по сетке
+\ No newline at end of file
+diff --git a/examples/example4/main.cpp b/examples/example4/main.cpp
+deleted file mode 100644
+index ac96ba4..0000000
+--- a/examples/example4/main.cpp
++++ /dev/null
+@@ -1,360 +0,0 @@
+-#include <iostream>
+-#include <vector>
+-#include <tuple>
+-#include <fstream>
+-#include <iomanip>
+-#include <thread>
+-#include <future>
+-#include <atomic>
+-
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/history_manager/history_manager.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h"
+-#include "mm/strategy/avelaneda_stoikov/config.h"
+-
+-// Структура для хранения результатов одного прогона
+-struct BacktestResult {
+-    std::string name;
+-    double gamma;
+-    double kappa;
+-    double sigma;
+-    double order_size;
+-    double max_inventory;
+-    double final_equity;
+-    double total_profit;
+-    double realized_pnl;
+-    double unrealized_pnl;
+-    double turnover;
+-    double fill_rate;
+-    double max_drawdown;
+-    int total_orders;
+-    int total_fills;
+-    double avg_inventory;
+-    double final_inventory;
+-    double avg_entry_price;
+-    int64_t execution_time_ms;
+-};
+-
+-// Атомарные счетчики
+-std::atomic<int> completed_count{0};
+-std::atomic<int> total_count{0};
+-
+-// Функция для запуска одного бектеста
+-BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
+-                           const std::string& name, 
+-                           double gamma, 
+-                           double kappa, 
+-                           double sigma,
+-                           double order_size,
+-                           double max_inventory) {
+-    
+-    auto start_time = std::chrono::high_resolution_clock::now();
+-    
+-    // Создаем бектестер с общим HistoryManager
+-    HFTBacktesterConfig config;
+-    config.cash = 7000.0;
+-    config.inventory = 0.0;
+-    HFTBacktester backtester(std::move(config), hm);
+-    
+-    // Настраиваем стратегию с учетом max_inventory
+-    ASParams params = {gamma, kappa, sigma, 1.0, max_inventory};
+-    auto strategy = std::make_unique<AvellanedaStoikovMicroPrice>(params, order_size);
+-    backtester.setStrategy(std::move(strategy));
+-    
+-    // Запускаем стратегию
+-    backtester.runStrategy();
+-    
+-    auto end_time = std::chrono::high_resolution_clock::now();
+-    auto execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+-    
+-    // Собираем результаты
+-    BacktestResult result;
+-    result.name = name;
+-    result.gamma = gamma;
+-    result.kappa = kappa;
+-    result.sigma = sigma;
+-    result.order_size = order_size;
+-    result.max_inventory = max_inventory;
+-    result.final_equity = backtester.getEquity();
+-    result.total_profit = result.final_equity - 7000.0;
+-    result.realized_pnl = backtester.getRealizedPnL();
+-    result.unrealized_pnl = backtester.getUnrealizedPnL();
+-    result.turnover = backtester.getTurnover();
+-    result.total_orders = backtester.getTotalOrdersPlaced();
+-    result.total_fills = backtester.getTotalFills();
+-    result.fill_rate = (result.total_orders > 0) ? 
+-                        (100.0 * result.total_fills / result.total_orders) : 0.0;
+-    result.final_inventory = backtester.getInventory();
+-    result.avg_entry_price = backtester.getAvgEntryPrice();
+-    result.execution_time_ms = execution_time;
+-    
+-    // Прогресс
+-    int completed = ++completed_count;
+-    int total = total_count.load();
+-    
+-    static std::atomic_flag cout_flag = ATOMIC_FLAG_INIT;
+-    while (cout_flag.test_and_set(std::memory_order_acquire)) {
+-        std::this_thread::yield();
+-    }
+-    
+-    std::cout << "[" << completed << "/" << total << "] " 
+-              << name << ": "
+-              << "PnL=$" << result.total_profit
+-              << " (realized=" << result.realized_pnl 
+-              << ", unrealized=" << result.unrealized_pnl << ")"
+-              << ", Fill=" << result.fill_rate << "%"
+-              << ", MaxInv=" << max_inventory
+-              << ", Time=" << execution_time << "ms" << std::endl;
+-    
+-    cout_flag.clear(std::memory_order_release);
+-    
+-    return result;
+-}
+-
+-// Сохранение результатов в CSV
+-void saveResultsToCSV(const std::vector<BacktestResult>& results, const std::string& filename) {
+-    std::ofstream file(filename);
+-    if (!file.is_open()) {
+-        std::cerr << "Cannot open file: " << filename << std::endl;
+-        return;
+-    }
+-    
+-    file << "name,gamma,kappa,sigma,order_size,max_inventory,final_equity,total_profit,"
+-         << "realized_pnl,unrealized_pnl,turnover,total_orders,total_fills,fill_rate,"
+-         << "final_inventory,avg_entry_price,execution_time_ms\n";
+-    
+-    for (const auto& r : results) {
+-        file << r.name << ","
+-             << r.gamma << ","
+-             << r.kappa << ","
+-             << r.sigma << ","
+-             << r.order_size << ","
+-             << r.max_inventory << ","
+-             << r.final_equity << ","
+-             << r.total_profit << ","
+-             << r.realized_pnl << ","
+-             << r.unrealized_pnl << ","
+-             << r.turnover << ","
+-             << r.total_orders << ","
+-             << r.total_fills << ","
+-             << r.fill_rate << ","
+-             << r.final_inventory << ","
+-             << r.avg_entry_price << ","
+-             << r.execution_time_ms << "\n";
+-    }
+-    
+-    file.close();
+-    std::cout << "Results saved to: " << filename << std::endl;
+-}
+-
+-int main(int argc, char* argv[]) {
+-    std::cout << "\n";
+-    std::cout << "╔═════════════════════════════════════════════════════════════════════╗\n";
+-    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov MicroPrice 2008/2018    ║\n";
+-    std::cout << "║           Parameter Sweep - Parallel Testing                        ║\n";
+-    std::cout << "╚═════════════════════════════════════════════════════════════════════╝\n";
+-    
+-    std::string l2_file = "../../../data/synced_lob.csv";
+-    std::string trade_file = "../../../data/synced_trades.csv";
+-    
+-    if (argc >= 2) l2_file = argv[1];
+-    if (argc >= 3) trade_file = argv[2];
+-    
+-    // Загрузка данных
+-    std::cout << "\nLoading L2 data..." << std::endl;
+-    auto hm = std::make_shared<HistoryManager>();
+-    hm->loadL2Data(l2_file);
+-    std::cout << "Loading Trade data..." << std::endl;
+-    hm->loadTradeData(trade_file);
+-    std::cout << "Loaded " << hm->getL2Size() << " L2 snapshots and " 
+-              << hm->getTradeSize() << " trades" << std::endl;
+-    
+-    std::vector<BacktestResult> results;
+-    
+-    // ============================================================
+-    // ПАРАМЕТРЫ ДЛЯ ТЕСТИРОВАНИЯ
+-    // ============================================================
+-    
+-    struct ParamSet {
+-        std::string name;
+-        double gamma;
+-        double kappa;
+-        double sigma;
+-        double order_size;
+-        double max_inventory;
+-    };
+-    
+-    std::vector<ParamSet> all_params;
+-    
+-    double base_gamma = 0.5;
+-    double base_kappa = 1000000.0;
+-    double base_sigma = 0.0002;
+-    double base_order_size = 50.0;
+-    double base_max_inventory = 5000.0;
+-    
+-    // 1. Тестирование разных gamma
+-    std::vector<double> gamma_values = {0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0};
+-    for (double gamma : gamma_values) {
+-        all_params.push_back({"gamma_" + std::to_string(gamma), gamma, base_kappa, base_sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 2. Тестирование разных kappa
+-    std::vector<double> kappa_values = {10000, 100000, 500000, 1000000, 5000000, 8000000, 10000000};
+-    for (double kappa : kappa_values) {
+-        all_params.push_back({"kappa_" + std::to_string(kappa), base_gamma, kappa, base_sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 3. Тестирование разных sigma
+-    std::vector<double> sigma_values = {0.0001, 0.0002, 0.0005, 0.001, 0.0015, 0.002, 0.005};
+-    for (double sigma : sigma_values) {
+-        all_params.push_back({"sigma_" + std::to_string(sigma), base_gamma, base_kappa, sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 4. Тестирование разных размеров ордеров
+-    std::vector<double> order_sizes = {10, 25, 50, 75, 100, 120, 150, 200, 500};
+-    for (double size : order_sizes) {
+-        all_params.push_back({"size_" + std::to_string(size), base_gamma, base_kappa, base_sigma, size, base_max_inventory});
+-    }
+-    
+-    // 5. Тестирование разных max_inventory
+-    std::vector<double> max_inventory_values = {1000, 2000, 3000, 4000, 5000, 7500, 10000};
+-    for (double max_inv : max_inventory_values) {
+-        all_params.push_back({"maxinv_" + std::to_string(max_inv), base_gamma, base_kappa, base_sigma, base_order_size, max_inv});
+-    }
+-    
+-    // 6. Grid search - оптимальные комбинации (расширенная сетка)
+-    std::vector<std::tuple<double, double, double, double, double>> grid_params = {
+-        // gamma, kappa, sigma, order_size, max_inventory
+-        {2.0, 5000000, 0.001, 100, 5000},
+-        {3.0, 8000000, 0.0015, 120, 5000},
+-        {2.5, 7000000, 0.0012, 110, 7500},
+-        {1.5, 3000000, 0.0008, 80, 4000},
+-        {4.0, 10000000, 0.002, 150, 10000},
+-        {0.8, 2000000, 0.0005, 60, 3000},
+-        {1.2, 4000000, 0.0007, 90, 6000},
+-        {3.5, 9000000, 0.0018, 130, 8000},
+-        // Более агрессивные настройки
+-        {5.0, 12000000, 0.0025, 200, 15000},
+-        {0.3, 1500000, 0.0003, 40, 2500},
+-        {2.0, 6000000, 0.001, 100, 2000},
+-        {4.0, 11000000, 0.001, 180, 12000}
+-    };
+-    
+-    int idx = 1;
+-    for (const auto& [g, k, s, sz, max_inv] : grid_params) {
+-        all_params.push_back({"grid_" + std::to_string(idx++), g, k, s, sz, max_inv});
+-    }
+-    
+-    // 7. Детальная сетка вокруг лучших параметров (grid_8: gamma=3, kappa=8e6, sigma=0.0015, size=120)
+-    std::vector<double> fine_gamma = {2.5, 2.8, 3.0, 3.2, 3.5};
+-    std::vector<double> fine_kappa = {7000000, 7500000, 8000000, 8500000, 9000000};
+-    std::vector<double> fine_sigma = {0.0012, 0.0014, 0.0015, 0.0016, 0.0018};
+-    std::vector<double> fine_sizes = {100, 110, 120, 130, 150};
+-    std::vector<double> fine_maxinv = {4000, 5000, 6000, 8000, 10000};
+-    
+-    int fine_idx = 1;
+-    for (double g : fine_gamma) {
+-        all_params.push_back({"fine_gamma_" + std::to_string(fine_idx++), g, 8000000, 0.0015, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double k : fine_kappa) {
+-        all_params.push_back({"fine_kappa_" + std::to_string(fine_idx++), 3.0, k, 0.0015, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double s : fine_sigma) {
+-        all_params.push_back({"fine_sigma_" + std::to_string(fine_idx++), 3.0, 8000000, s, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double sz : fine_sizes) {
+-        all_params.push_back({"fine_size_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, sz, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double max_inv : fine_maxinv) {
+-        all_params.push_back({"fine_maxinv_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, 120, max_inv});
+-    }
+-    
+-    total_count = all_params.size();
+-    
+-    std::cout << "\nTotal parameter sets: " << total_count.load() << std::endl;
+-    std::cout << "Running in parallel (" << std::thread::hardware_concurrency() << " threads)...\n" << std::endl;
+-    
+-    // Параллельный запуск
+-    auto start_total = std::chrono::high_resolution_clock::now();
+-    
+-    std::vector<std::future<BacktestResult>> futures;
+-    for (const auto& p : all_params) {
+-        futures.push_back(std::async(std::launch::async, runBacktest, hm, p.name, 
+-                                      p.gamma, p.kappa, p.sigma, p.order_size, p.max_inventory));
+-    }
+-    
+-    for (auto& f : futures) {
+-        results.push_back(f.get());
+-    }
+-    
+-    auto end_total = std::chrono::high_resolution_clock::now();
+-    auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_total - start_total).count();
+-    
+-    // Сохранение результатов
+-    saveResultsToCSV(results, "backtest_results_summary.csv");
+-    
+-    // Вывод лучших результатов
+-    std::cout << "\n" << std::string(80, '=') << std::endl;
+-    std::cout << "BEST RESULTS SUMMARY" << std::endl;
+-    std::cout << std::string(80, '=') << std::endl;
+-    
+-    // Сортировка по прибыли
+-    auto sorted_by_profit = results;
+-    std::sort(sorted_by_profit.begin(), sorted_by_profit.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.total_profit > b.total_profit;
+-        });
+-    
+-    std::cout << "\n🏆 TOP 10 BY TOTAL PROFIT:" << std::endl;
+-    for (int i = 0; i < std::min(10, (int)sorted_by_profit.size()); ++i) {
+-        const auto& r = sorted_by_profit[i];
+-        std::cout << "   " << (i+1) << ". " << r.name 
+-                  << " | Profit=$" << r.total_profit
+-                  << " | Realized=$" << r.realized_pnl
+-                  << " | Unrealized=$" << r.unrealized_pnl
+-                  << " | Fill=" << r.fill_rate << "%"
+-                  << " | Gamma=" << r.gamma
+-                  << " | Kappa=" << r.kappa
+-                  << " | Sigma=" << r.sigma
+-                  << " | Size=" << r.order_size
+-                  << " | MaxInv=" << r.max_inventory << std::endl;
+-    }
+-    
+-    // Лучший по прибыли
+-    auto best = sorted_by_profit[0];
+-    std::cout << "\n🏆 BEST OVERALL: " << best.name << std::endl;
+-    std::cout << "   gamma=" << best.gamma << ", kappa=" << best.kappa 
+-              << ", sigma=" << best.sigma << ", size=" << best.order_size 
+-              << ", max_inventory=" << best.max_inventory << std::endl;
+-    std::cout << "   Profit=$" << best.total_profit 
+-              << " (realized=" << best.realized_pnl 
+-              << ", unrealized=" << best.unrealized_pnl << ")"
+-              << ", Fill Rate=" << best.fill_rate << "%" << std::endl;
+-    
+-    // Лучший по fill rate
+-    auto best_fill = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.fill_rate < b.fill_rate;
+-        });
+-    std::cout << "\n📈 BEST FILL RATE: " << best_fill->name << std::endl;
+-    std::cout << "   Fill Rate=" << best_fill->fill_rate << "%, Profit=$" << best_fill->total_profit << std::endl;
+-    
+-    // Лучший по realized PnL
+-    auto best_realized = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.realized_pnl < b.realized_pnl;
+-        });
+-    std::cout << "\n💵 BEST REALIZED PNL: " << best_realized->name << std::endl;
+-    std::cout << "   Realized=$" << best_realized->realized_pnl << ", Profit=$" << best_realized->total_profit << std::endl;
+-    
+-    // Лучший по Sharpe
+-    std::cout << "\n⏱️  Total execution time: " << total_time << " ms (" << total_time/1000 << " sec)" << std::endl;
+-    std::cout << "   Average time per test: " << total_time / total_count.load() << " ms" << std::endl;
+-    std::cout << "\nDone. Results saved to backtest_results_summary.csv\n";
+-    
+-    return 0;
+-}
+\ No newline at end of file
+diff --git a/examples/example5/CMakeLists.txt b/examples/example5/CMakeLists.txt
+deleted file mode 100644
+index a710cc8..0000000
+--- a/examples/example5/CMakeLists.txt
++++ /dev/null
+@@ -1,37 +0,0 @@
+-
+-set (PROJECT_NAME example5)
+-project(${PROJECT_NAME})
+-
+-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+-SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+-
+-file(GLOB SRC
+-     "*.cpp"
+-)
+-
+-
+-add_executable (${PROJECT_NAME}
+-    ${SRC}
+-)
+-
+-target_link_libraries(${PROJECT_NAME}
+-mm
+-)
+-
+-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+-set_target_properties(${PROJECT_NAME} PROPERTIES
+-    CXX_SCAN_FOR_MODULES OFF
+-    CXX_MODULE_STD_ONLY OFF
+-)
+-# Запрещаем CMake добавлять флаги модулей
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API OFF)
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 0)
+-
+-option(ENABLE_SANITIZERS "Enable AddressSanitizer and LeakSanitizer" ON)
+-
+-if (ENABLE_SANITIZERS)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,leak -fno-omit-frame-pointer -g")
+-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,leak")
+-endif()
+\ No newline at end of file
+diff --git a/examples/example5/README.md b/examples/example5/README.md
+deleted file mode 100644
+index ae70ea6..0000000
+--- a/examples/example5/README.md
++++ /dev/null
+@@ -1 +0,0 @@
+-Запуск авеланеды штоикова микропрайс gmn единчиная
+\ No newline at end of file
+diff --git a/examples/example5/main.cpp b/examples/example5/main.cpp
+deleted file mode 100644
+index 141351d..0000000
+--- a/examples/example5/main.cpp
++++ /dev/null
+@@ -1,75 +0,0 @@
+-// hft_backtester_complete.cpp
+-// Complete HFT Backtester for CMF Entrance Exam
+-// Implements Avellaneda-Stoikov (2008) with microprice extension (2018)
+-
+-#include <iostream>
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h"
+-
+-#include "mm/strategy/avelaneda_stoikov/config.h"
+-// ==============================
+-// Main Function
+-// ==============================
+-
+-int main(int argc, char* argv[]) {
+-    std::cout << "\n";
+-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+-    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov 2008/2018    ║\n";
+-    std::cout << "║           Advanced Quantitative Analytics Program        ║\n";
+-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+-    
+-    // Default file names
+-    std::string l2_file = "../../../data/synced_lob.csv";
+-    std::string trade_file = "../../../data/synced_trades.csv";
+-    
+-    double gamma = 0.5;
+-    double kappa = 1000000;
+-    double sigma = 0.0005;
+-    // double gamma = 0.1;      // Низкая риск-аверсность (позволяет большие позиции)
+-    // double kappa = 1000.0;   // Умеренный спред
+-    // double sigma = 0.001;
+-    // Override from command line if provided
+-    if (argc >= 2) l2_file = argv[1];
+-    if (argc >= 3) trade_file = argv[2];
+-    try {
+-        if (argc >= 4) gamma = std::stod(argv[3]);
+-        if (argc >= 5) kappa = std::stod(argv[4]);
+-        if (argc >= 6) sigma = std::stod(argv[5]);
+-    } catch (const std::exception& e) {
+-        std::cerr << "Error parsing numeric arguments: " << e.what() << std::endl;
+-        return 1;
+-    }
+-
+-    HFTBacktesterConfig backtester_config;
+-    // Create backtester instance
+-    HFTBacktester backtester(std::move(backtester_config));
+-    ASParams config = {
+-        gamma,          // gamma: не трогаем
+-        kappa,      // kappa: 
+-                    // Это сузит Model Spread до разумных пределов.
+-        sigma,       // sigma: 
+-                    // Это должно наконец дать "Inv Risk" > 0 в логах.
+-        1.0,          
+-        5000.0        
+-    };
+-    auto strategy = std::make_unique<AvellanedaStoikovMicroPrice>(config, 50.0);
+-    backtester.setStrategy(std::move(strategy));
+-    
+-    
+-    // Load data
+-    std::cout << "\nLoading data...\n";
+-    backtester.loadL2Data(l2_file);
+-    backtester.loadTradeData(trade_file);
+-    
+-    // Run simulation
+-    backtester.runStrategy();
+-    
+-    // Generate reports
+-    backtester.generateReport();
+-    // backtester.exportResults("backtest_results.csv");
+-    // backtester.exportFills("fills.csv");
+-    
+-    std::cout << "\nDone.\n";
+-    
+-    return 0;
+-}
+\ No newline at end of file
+diff --git a/examples/example6/CMakeLists.txt b/examples/example6/CMakeLists.txt
+deleted file mode 100644
+index 3ae0832..0000000
+--- a/examples/example6/CMakeLists.txt
++++ /dev/null
+@@ -1,37 +0,0 @@
+-
+-set (PROJECT_NAME example6)
+-project(${PROJECT_NAME})
+-
+-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+-SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+-
+-file(GLOB SRC
+-     "*.cpp"
+-)
+-
+-
+-add_executable (${PROJECT_NAME}
+-    ${SRC}
+-)
+-
+-target_link_libraries(${PROJECT_NAME}
+-mm
+-)
+-
+-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+-set_target_properties(${PROJECT_NAME} PROPERTIES
+-    CXX_SCAN_FOR_MODULES OFF
+-    CXX_MODULE_STD_ONLY OFF
+-)
+-# Запрещаем CMake добавлять флаги модулей
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API OFF)
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 0)
+-
+-option(ENABLE_SANITIZERS "Enable AddressSanitizer and LeakSanitizer" ON)
+-
+-if (ENABLE_SANITIZERS)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,leak -fno-omit-frame-pointer -g")
+-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,leak")
+-endif()
+\ No newline at end of file
+diff --git a/examples/example6/README.md b/examples/example6/README.md
+deleted file mode 100644
+index 6b2d2ce..0000000
+--- a/examples/example6/README.md
++++ /dev/null
+@@ -1 +0,0 @@
+-Запуск авеланеды штоикова классическая gmn по сетке
+\ No newline at end of file
+diff --git a/examples/example6/main.cpp b/examples/example6/main.cpp
+deleted file mode 100644
+index 44669f6..0000000
+--- a/examples/example6/main.cpp
++++ /dev/null
+@@ -1,360 +0,0 @@
+-#include <iostream>
+-#include <vector>
+-#include <tuple>
+-#include <fstream>
+-#include <iomanip>
+-#include <thread>
+-#include <future>
+-#include <atomic>
+-
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/history_manager/history_manager.h"
+-#include "mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h"
+-#include "mm/strategy/avelaneda_stoikov/config.h"
+-
+-// Структура для хранения результатов одного прогона
+-struct BacktestResult {
+-    std::string name;
+-    double gamma;
+-    double kappa;
+-    double sigma;
+-    double order_size;
+-    double max_inventory;
+-    double final_equity;
+-    double total_profit;
+-    double realized_pnl;
+-    double unrealized_pnl;
+-    double turnover;
+-    double fill_rate;
+-    double max_drawdown;
+-    int total_orders;
+-    int total_fills;
+-    double avg_inventory;
+-    double final_inventory;
+-    double avg_entry_price;
+-    int64_t execution_time_ms;
+-};
+-
+-// Атомарные счетчики
+-std::atomic<int> completed_count{0};
+-std::atomic<int> total_count{0};
+-
+-// Функция для запуска одного бектеста
+-BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
+-                           const std::string& name, 
+-                           double gamma, 
+-                           double kappa, 
+-                           double sigma,
+-                           double order_size,
+-                           double max_inventory) {
+-    
+-    auto start_time = std::chrono::high_resolution_clock::now();
+-    
+-    // Создаем бектестер с общим HistoryManager
+-    HFTBacktesterConfig config;
+-    config.cash = 7000.0;
+-    config.inventory = 0.0;
+-    HFTBacktester backtester(std::move(config), hm);
+-    
+-    // Настраиваем стратегию с учетом max_inventory
+-    ASParams params = {gamma, kappa, sigma, 1.0, max_inventory};
+-    auto strategy = std::make_unique<AvellanedaStoikovClassicGmn>(params, order_size);
+-    backtester.setStrategy(std::move(strategy));
+-    
+-    // Запускаем стратегию
+-    backtester.runStrategy();
+-    
+-    auto end_time = std::chrono::high_resolution_clock::now();
+-    auto execution_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+-    
+-    // Собираем результаты
+-    BacktestResult result;
+-    result.name = name;
+-    result.gamma = gamma;
+-    result.kappa = kappa;
+-    result.sigma = sigma;
+-    result.order_size = order_size;
+-    result.max_inventory = max_inventory;
+-    result.final_equity = backtester.getEquity();
+-    result.total_profit = result.final_equity - 7000.0;
+-    result.realized_pnl = backtester.getRealizedPnL();
+-    result.unrealized_pnl = backtester.getUnrealizedPnL();
+-    result.turnover = backtester.getTurnover();
+-    result.total_orders = backtester.getTotalOrdersPlaced();
+-    result.total_fills = backtester.getTotalFills();
+-    result.fill_rate = (result.total_orders > 0) ? 
+-                        (100.0 * result.total_fills / result.total_orders) : 0.0;
+-    result.final_inventory = backtester.getInventory();
+-    result.avg_entry_price = backtester.getAvgEntryPrice();
+-    result.execution_time_ms = execution_time;
+-    
+-    // Прогресс
+-    int completed = ++completed_count;
+-    int total = total_count.load();
+-    
+-    static std::atomic_flag cout_flag = ATOMIC_FLAG_INIT;
+-    while (cout_flag.test_and_set(std::memory_order_acquire)) {
+-        std::this_thread::yield();
+-    }
+-    
+-    std::cout << "[" << completed << "/" << total << "] " 
+-              << name << ": "
+-              << "PnL=$" << result.total_profit
+-              << " (realized=" << result.realized_pnl 
+-              << ", unrealized=" << result.unrealized_pnl << ")"
+-              << ", Fill=" << result.fill_rate << "%"
+-              << ", MaxInv=" << max_inventory
+-              << ", Time=" << execution_time << "ms" << std::endl;
+-    
+-    cout_flag.clear(std::memory_order_release);
+-    
+-    return result;
+-}
+-
+-// Сохранение результатов в CSV
+-void saveResultsToCSV(const std::vector<BacktestResult>& results, const std::string& filename) {
+-    std::ofstream file(filename);
+-    if (!file.is_open()) {
+-        std::cerr << "Cannot open file: " << filename << std::endl;
+-        return;
+-    }
+-    
+-    file << "name,gamma,kappa,sigma,order_size,max_inventory,final_equity,total_profit,"
+-         << "realized_pnl,unrealized_pnl,turnover,total_orders,total_fills,fill_rate,"
+-         << "final_inventory,avg_entry_price,execution_time_ms\n";
+-    
+-    for (const auto& r : results) {
+-        file << r.name << ","
+-             << r.gamma << ","
+-             << r.kappa << ","
+-             << r.sigma << ","
+-             << r.order_size << ","
+-             << r.max_inventory << ","
+-             << r.final_equity << ","
+-             << r.total_profit << ","
+-             << r.realized_pnl << ","
+-             << r.unrealized_pnl << ","
+-             << r.turnover << ","
+-             << r.total_orders << ","
+-             << r.total_fills << ","
+-             << r.fill_rate << ","
+-             << r.final_inventory << ","
+-             << r.avg_entry_price << ","
+-             << r.execution_time_ms << "\n";
+-    }
+-    
+-    file.close();
+-    std::cout << "Results saved to: " << filename << std::endl;
+-}
+-
+-int main(int argc, char* argv[]) {
+-    std::cout << "\n";
+-    std::cout << "╔══════════════════════════════════════════════════════════╗\n";
+-    std::cout << "║     CMF HFT Backtester - Avellaneda-Stoikov 2008/2018    ║\n";
+-    std::cout << "║           Parameter Sweep - Parallel Testing             ║\n";
+-    std::cout << "╚══════════════════════════════════════════════════════════╝\n";
+-    
+-    std::string l2_file = "../../../data/synced_lob.csv";
+-    std::string trade_file = "../../../data/synced_trades.csv";
+-    
+-    if (argc >= 2) l2_file = argv[1];
+-    if (argc >= 3) trade_file = argv[2];
+-    
+-    // Загрузка данных
+-    std::cout << "\nLoading L2 data..." << std::endl;
+-    auto hm = std::make_shared<HistoryManager>();
+-    hm->loadL2Data(l2_file);
+-    std::cout << "Loading Trade data..." << std::endl;
+-    hm->loadTradeData(trade_file);
+-    std::cout << "Loaded " << hm->getL2Size() << " L2 snapshots and " 
+-              << hm->getTradeSize() << " trades" << std::endl;
+-    
+-    std::vector<BacktestResult> results;
+-    
+-    // ============================================================
+-    // ПАРАМЕТРЫ ДЛЯ ТЕСТИРОВАНИЯ
+-    // ============================================================
+-    
+-    struct ParamSet {
+-        std::string name;
+-        double gamma;
+-        double kappa;
+-        double sigma;
+-        double order_size;
+-        double max_inventory;
+-    };
+-    
+-    std::vector<ParamSet> all_params;
+-    
+-    double base_gamma = 0.5;
+-    double base_kappa = 1000000.0;
+-    double base_sigma = 0.0002;
+-    double base_order_size = 50.0;
+-    double base_max_inventory = 5000.0;
+-    
+-    // 1. Тестирование разных gamma
+-    std::vector<double> gamma_values = {0.1, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0};
+-    for (double gamma : gamma_values) {
+-        all_params.push_back({"gamma_" + std::to_string(gamma), gamma, base_kappa, base_sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 2. Тестирование разных kappa
+-    std::vector<double> kappa_values = {10000, 100000, 500000, 1000000, 5000000, 8000000, 10000000};
+-    for (double kappa : kappa_values) {
+-        all_params.push_back({"kappa_" + std::to_string(kappa), base_gamma, kappa, base_sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 3. Тестирование разных sigma
+-    std::vector<double> sigma_values = {0.0001, 0.0002, 0.0005, 0.001, 0.0015, 0.002, 0.005};
+-    for (double sigma : sigma_values) {
+-        all_params.push_back({"sigma_" + std::to_string(sigma), base_gamma, base_kappa, sigma, base_order_size, base_max_inventory});
+-    }
+-    
+-    // 4. Тестирование разных размеров ордеров
+-    std::vector<double> order_sizes = {10, 25, 50, 75, 100, 120, 150, 200, 500};
+-    for (double size : order_sizes) {
+-        all_params.push_back({"size_" + std::to_string(size), base_gamma, base_kappa, base_sigma, size, base_max_inventory});
+-    }
+-    
+-    // 5. Тестирование разных max_inventory
+-    std::vector<double> max_inventory_values = {1000, 2000, 3000, 4000, 5000, 7500, 10000};
+-    for (double max_inv : max_inventory_values) {
+-        all_params.push_back({"maxinv_" + std::to_string(max_inv), base_gamma, base_kappa, base_sigma, base_order_size, max_inv});
+-    }
+-    
+-    // 6. Grid search - оптимальные комбинации (расширенная сетка)
+-    std::vector<std::tuple<double, double, double, double, double>> grid_params = {
+-        // gamma, kappa, sigma, order_size, max_inventory
+-        {2.0, 5000000, 0.001, 100, 5000},
+-        {3.0, 8000000, 0.0015, 120, 5000},
+-        {2.5, 7000000, 0.0012, 110, 7500},
+-        {1.5, 3000000, 0.0008, 80, 4000},
+-        {4.0, 10000000, 0.002, 150, 10000},
+-        {0.8, 2000000, 0.0005, 60, 3000},
+-        {1.2, 4000000, 0.0007, 90, 6000},
+-        {3.5, 9000000, 0.0018, 130, 8000},
+-        // Более агрессивные настройки
+-        {5.0, 12000000, 0.0025, 200, 15000},
+-        {0.3, 1500000, 0.0003, 40, 2500},
+-        {2.0, 6000000, 0.001, 100, 2000},
+-        {4.0, 11000000, 0.001, 180, 12000}
+-    };
+-    
+-    int idx = 1;
+-    for (const auto& [g, k, s, sz, max_inv] : grid_params) {
+-        all_params.push_back({"grid_" + std::to_string(idx++), g, k, s, sz, max_inv});
+-    }
+-    
+-    // 7. Детальная сетка вокруг лучших параметров (grid_8: gamma=3, kappa=8e6, sigma=0.0015, size=120)
+-    std::vector<double> fine_gamma = {2.5, 2.8, 3.0, 3.2, 3.5};
+-    std::vector<double> fine_kappa = {7000000, 7500000, 8000000, 8500000, 9000000};
+-    std::vector<double> fine_sigma = {0.0012, 0.0014, 0.0015, 0.0016, 0.0018};
+-    std::vector<double> fine_sizes = {100, 110, 120, 130, 150};
+-    std::vector<double> fine_maxinv = {4000, 5000, 6000, 8000, 10000};
+-    
+-    int fine_idx = 1;
+-    for (double g : fine_gamma) {
+-        all_params.push_back({"fine_gamma_" + std::to_string(fine_idx++), g, 8000000, 0.0015, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double k : fine_kappa) {
+-        all_params.push_back({"fine_kappa_" + std::to_string(fine_idx++), 3.0, k, 0.0015, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double s : fine_sigma) {
+-        all_params.push_back({"fine_sigma_" + std::to_string(fine_idx++), 3.0, 8000000, s, 120, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double sz : fine_sizes) {
+-        all_params.push_back({"fine_size_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, sz, 5000});
+-    }
+-    fine_idx = 1;
+-    for (double max_inv : fine_maxinv) {
+-        all_params.push_back({"fine_maxinv_" + std::to_string(fine_idx++), 3.0, 8000000, 0.0015, 120, max_inv});
+-    }
+-    
+-    total_count = all_params.size();
+-    
+-    std::cout << "\nTotal parameter sets: " << total_count.load() << std::endl;
+-    std::cout << "Running in parallel (" << std::thread::hardware_concurrency() << " threads)...\n" << std::endl;
+-    
+-    // Параллельный запуск
+-    auto start_total = std::chrono::high_resolution_clock::now();
+-    
+-    std::vector<std::future<BacktestResult>> futures;
+-    for (const auto& p : all_params) {
+-        futures.push_back(std::async(std::launch::async, runBacktest, hm, p.name, 
+-                                      p.gamma, p.kappa, p.sigma, p.order_size, p.max_inventory));
+-    }
+-    
+-    for (auto& f : futures) {
+-        results.push_back(f.get());
+-    }
+-    
+-    auto end_total = std::chrono::high_resolution_clock::now();
+-    auto total_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_total - start_total).count();
+-    
+-    // Сохранение результатов
+-    saveResultsToCSV(results, "backtest_results_summary.csv");
+-    
+-    // Вывод лучших результатов
+-    std::cout << "\n" << std::string(80, '=') << std::endl;
+-    std::cout << "BEST RESULTS SUMMARY" << std::endl;
+-    std::cout << std::string(80, '=') << std::endl;
+-    
+-    // Сортировка по прибыли
+-    auto sorted_by_profit = results;
+-    std::sort(sorted_by_profit.begin(), sorted_by_profit.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.total_profit > b.total_profit;
+-        });
+-    
+-    std::cout << "\n🏆 TOP 10 BY TOTAL PROFIT:" << std::endl;
+-    for (int i = 0; i < std::min(10, (int)sorted_by_profit.size()); ++i) {
+-        const auto& r = sorted_by_profit[i];
+-        std::cout << "   " << (i+1) << ". " << r.name 
+-                  << " | Profit=$" << r.total_profit
+-                  << " | Realized=$" << r.realized_pnl
+-                  << " | Unrealized=$" << r.unrealized_pnl
+-                  << " | Fill=" << r.fill_rate << "%"
+-                  << " | Gamma=" << r.gamma
+-                  << " | Kappa=" << r.kappa
+-                  << " | Sigma=" << r.sigma
+-                  << " | Size=" << r.order_size
+-                  << " | MaxInv=" << r.max_inventory << std::endl;
+-    }
+-    
+-    // Лучший по прибыли
+-    auto best = sorted_by_profit[0];
+-    std::cout << "\n🏆 BEST OVERALL: " << best.name << std::endl;
+-    std::cout << "   gamma=" << best.gamma << ", kappa=" << best.kappa 
+-              << ", sigma=" << best.sigma << ", size=" << best.order_size 
+-              << ", max_inventory=" << best.max_inventory << std::endl;
+-    std::cout << "   Profit=$" << best.total_profit 
+-              << " (realized=" << best.realized_pnl 
+-              << ", unrealized=" << best.unrealized_pnl << ")"
+-              << ", Fill Rate=" << best.fill_rate << "%" << std::endl;
+-    
+-    // Лучший по fill rate
+-    auto best_fill = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.fill_rate < b.fill_rate;
+-        });
+-    std::cout << "\n📈 BEST FILL RATE: " << best_fill->name << std::endl;
+-    std::cout << "   Fill Rate=" << best_fill->fill_rate << "%, Profit=$" << best_fill->total_profit << std::endl;
+-    
+-    // Лучший по realized PnL
+-    auto best_realized = std::max_element(results.begin(), results.end(),
+-        [](const BacktestResult& a, const BacktestResult& b) {
+-            return a.realized_pnl < b.realized_pnl;
+-        });
+-    std::cout << "\n💵 BEST REALIZED PNL: " << best_realized->name << std::endl;
+-    std::cout << "   Realized=$" << best_realized->realized_pnl << ", Profit=$" << best_realized->total_profit << std::endl;
+-    
+-    // Лучший по Sharpe
+-    std::cout << "\n⏱️  Total execution time: " << total_time << " ms (" << total_time/1000 << " sec)" << std::endl;
+-    std::cout << "   Average time per test: " << total_time / total_count.load() << " ms" << std::endl;
+-    std::cout << "\nDone. Results saved to backtest_results_summary.csv\n";
+-    
+-    return 0;
+-}
+\ No newline at end of file
+diff --git a/examples/example7_debug/CMakeLists.txt b/examples/example7_debug/CMakeLists.txt
+deleted file mode 100644
+index 53dcabb..0000000
+--- a/examples/example7_debug/CMakeLists.txt
++++ /dev/null
+@@ -1,37 +0,0 @@
+-
+-set (PROJECT_NAME example7)
+-project(${PROJECT_NAME})
+-
+-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+-SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+-SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
+-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+-
+-file(GLOB SRC
+-     "*.cpp"
+-)
+-
+-
+-add_executable (${PROJECT_NAME}
+-    ${SRC}
+-)
+-
+-target_link_libraries(${PROJECT_NAME}
+-mm
+-)
+-
+-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 23)
+-set_target_properties(${PROJECT_NAME} PROPERTIES
+-    CXX_SCAN_FOR_MODULES OFF
+-    CXX_MODULE_STD_ONLY OFF
+-)
+-# Запрещаем CMake добавлять флаги модулей
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_CMAKE_API OFF)
+-set(CMAKE_EXPERIMENTAL_CXX_MODULE_DYNDEP 0)
+-
+-option(ENABLE_SANITIZERS "Enable AddressSanitizer and LeakSanitizer" ON)
+-
+-if (ENABLE_SANITIZERS)
+-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,leak -fno-omit-frame-pointer -g")
+-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address,leak")
+-endif()
+\ No newline at end of file
+diff --git a/examples/example7_debug/README.md b/examples/example7_debug/README.md
+deleted file mode 100644
+index ae70ea6..0000000
+--- a/examples/example7_debug/README.md
++++ /dev/null
+@@ -1 +0,0 @@
+-Запуск авеланеды штоикова микропрайс gmn единчиная
+\ No newline at end of file
+diff --git a/examples/example7_debug/main.cpp b/examples/example7_debug/main.cpp
+deleted file mode 100644
+index dc7b532..0000000
+--- a/examples/example7_debug/main.cpp
++++ /dev/null
+@@ -1,246 +0,0 @@
+-// hft_backtester_complete.cpp
+-// Complete HFT Backtester for CMF Entrance Exam
+-// Implements Avellaneda-Stoikov (2008) with microprice extension (2018)
+-
+-#include <iostream>
+-#include <filesystem>
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h"
+-#include "mm/history_manager/history_manager.h"
+-#include "mm/strategy/avelaneda_stoikov/config.h"
+-
+-void createTestL2File(const std::string& filename, 
+-                       const std::vector<std::tuple<int64_t, 
+-                       std::vector<std::pair<double, double>>, 
+-                       std::vector<std::pair<double, double>>>>& snapshots,
+-                       int max_depth = 0) { // 0 означает "автоматически по максимальному"
+-    
+-    // 1. Если max_depth не задан, находим самый глубокий стакан в данных
+-    if (max_depth == 0) {
+-        for (const auto& [ts, asks, bids] : snapshots) {
+-            max_depth = std::max({max_depth, (int)asks.size(), (int)bids.size()});
+-        }
+-    }
+-
+-    std::ofstream file(filename);
+-    
+-    // 2. Генерируем заголовок динамически
+-    file << "row,timestamp";
+-    for (int i = 0; i < max_depth; i++) {
+-        file << ",ask_price" << i << ",ask_vol" << i 
+-             << ",bid_price" << i << ",bid_vol" << i;
+-    }
+-    file << "\n";
+-    
+-    // 3. Заполняем данными
+-    for (size_t idx = 0; idx < snapshots.size(); ++idx) {
+-        const auto& [ts, asks, bids] = snapshots[idx];
+-        file << idx + 1 << "," << ts;
+-        
+-        for (int i = 0; i < max_depth; i++) {
+-            // Данные асков
+-            if (i < (int)asks.size()) {
+-                file << "," << asks[i].first << "," << asks[i].second;
+-            } else {
+-                file << ",0.0,0.0"; // Добиваем пустоту нулями
+-            }
+-
+-            // Данные бидов
+-            if (i < (int)bids.size()) {
+-                file << "," << bids[i].first << "," << bids[i].second;
+-            } else {
+-                file << ",0.0,0.0";
+-            }
+-        }
+-        file << "\n";
+-    }
+-    file.close();
+-}
+-
+-void createTestTradeFile(const std::string& filename, 
+-                         const std::vector<std::tuple<int64_t, TradeSide, double, double>>& trades) {
+-    std::ofstream file(filename);
+-    file << "row,timestamp,side,price,amount\n";
+-    for (size_t i = 0; i < trades.size(); ++i) {
+-        auto [ts, side, price, amount] = trades[i];
+-        file << i + 1 << "," << ts << ",";
+-        file << (side == TradeSide::kBuy ? "buy" : "sell") << ",";
+-        file << price << "," << amount << "\n";
+-    }
+-    file.close();
+-}
+-
+- class BuySellStrategy : public IStrategy {
+-    public:
+-        enum State { INIT, BOUGHT, DONE } state = INIT;
+-        double tick_size = 0.1;
+-        
+-        void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+-            if (state == INIT && !ctx.l2.bids.empty()) {
+-                // Ставим лимитку на покупку лучше рынка: 100.0 + 0.1 = 100.1
+-                double buy_price = ctx.l2.bids[0].first + tick_size;
+-                std::cout << "TS: " << ctx.current_timestamp << " | Sending LIMIT BUY: " << buy_price << std::endl;
+-                api->submitLimitOrder(Side::kBid, buy_price, 50);
+-                state = BOUGHT;
+-            }
+-            else if (state == BOUGHT && ctx.inventory >= 50.0 && !ctx.l2.asks.empty()) {
+-                // После покупки ставим лимитку на продажу лучше рынка: 110.0 - 0.1 = 109.9
+-                double sell_price = ctx.l2.asks[0].first - tick_size;
+-                std::cout << "TS: " << ctx.current_timestamp << " | Sending LIMIT SELL: " << sell_price << std::endl;
+-                api->submitLimitOrder(Side::kAsk, sell_price, 50);
+-                state = DONE;
+-            }
+-        }
+-        
+-        void onFill(const Fill& fill) override {
+-            std::cout << "  >>> FILL: " << fill.amount << " @ " << fill.price 
+-                      << " " << (fill.side == Side::kBid ? "BUY" : "SELL") << std::endl;
+-        }
+-    };
+-
+-// ==============================
+-// Main Function
+-// ==============================
+-
+-// int main(int argc, char* argv[]) {
+-//      std::cout << "\n=== Test 4: Buy and Sell Cycle (Tick 0.1) ===" << std::endl;
+-    
+-   
+-    
+-//     auto hm = std::make_shared<HistoryManager>();
+-    
+-//     // Снапшоты: {timestamp, asks, bids}
+-//     std::vector<std::tuple<int64_t, std::vector<std::pair<double, double>>, std::vector<std::pair<double, double>>>> snapshots = {
+-//         {1000, {{105.0, 1000}}, {{100.0, 1000}}}, // ТУТ: поставим Bid 100.1
+-//         {3000, {{110.0, 1000}}, {{105.0, 1000}}}  // ТУТ: уже купили, ставим Ask 109.9
+-//     };
+-//     createTestL2File("test_cycle_l2.csv", snapshots);
+-//     hm->loadL2Data("test_cycle_l2.csv");
+-    
+-//     // Трейды для исполнения наших ордеров
+-//     std::vector<std::tuple<int64_t, TradeSide, double, double>> trades = {
+-//         {2000, TradeSide::kSell, 100.1, 50}, // Исполняет покупку по 100.1
+-//         {4000, TradeSide::kBuy, 109.9, 50}   // Исполняет продажу по 109.9
+-//     };
+-//     createTestTradeFile("test_cycle_trade.csv", trades);
+-//     hm->loadTradeData("test_cycle_trade.csv");
+-    
+-//     HFTBacktesterConfig config;
+-//     config.cash = 1000000.0;
+-//     config.inventory = 0.0;
+-//     HFTBacktester backtester(std::move(config), hm);
+-    
+-//     backtester.setStrategy(std::make_unique<BuySellStrategy>());
+-//     backtester.runStrategy();
+-    
+-//     // === ТОЧНЫЙ АНАЛИТИЧЕСКИЙ РАСЧЕТ ===
+-    
+-//     // 1. Покупка: 50 @ 100.1 = 5005.0 (Cash становится 994995.0)
+-//     // 2. Продажа: 50 @ 109.9 = 5495.0 (Cash становится 994995.0 + 5495.0 = 1000490.0)
+-    
+-//     double expected_cash = 1000490.0;
+-//     double expected_inv = 0.0;
+-    
+-//     // Поскольку инвентарь 0, PnL обязан быть равен Cash
+-//     double expected_pnl = expected_cash;
+-    
+-//     // Проверка логики прибыли: (109.9 - 100.1) * 50 = 9.8 * 50 = 490.0
+-    
+-//     std::cout << "\n=== FINAL CHECKS ===" << std::endl;
+-//     std::cout << std::fixed << std::setprecision(2);
+-//     std::cout << "Final Cash: " << backtester.getCash() << std::endl;
+-//     std::cout << "Final PnL:  " << backtester.getEquity() << std::endl;
+-    
+-//     // EXPECT_DOUBLE_EQ(backtester.getInventory(), expected_inv);
+-//     // EXPECT_NEAR(backtester.getCash(), expected_cash, 1e-7);
+-//     // EXPECT_NEAR(backtester.getEquity(), expected_pnl, 1e-7);
+-//     // EXPECT_EQ(backtester.getTotalFills(), 2);
+-    
+-//     std::filesystem::remove("test_cycle_l2.csv");
+-//     std::filesystem::remove("test_cycle_trade.csv");
+-    
+-//     return 0;
+-// }
+-
+-int main(int argc, char* argv[]) {
+-    // Стратегия для продажи с отменой
+-    class SimpleSellCancelStrategy : public IStrategy {
+-    public:
+-        bool order_sent = false;
+-        bool cancel_done = false;
+-        
+-        void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+-            if (!order_sent && !ctx.l2.bids.empty()) {
+-                api->submitLimitOrder(Side::kAsk, 100.0, 100);
+-                order_sent = true;
+-                std::cout << "SELL order sent at " << ctx.current_timestamp << std::endl;
+-            }
+-            
+-            if (order_sent && !cancel_done && ctx.current_timestamp > 2000) {
+-                api->cancelAll();
+-                cancel_done = true;
+-                std::cout << "Order cancelled at " << ctx.current_timestamp << std::endl;
+-            }
+-        }
+-    };
+-    
+-    std::cout << "\n=== Test SellWithCancelAfterPartialFill START ===" << std::endl;
+-    
+-    HFTBacktesterConfig config;
+-    config.cash = 1000000.0;
+-    config.inventory = 100.0;  // Начинаем с 100 единиц
+-    HFTBacktester backtester(std::move(config));
+-    
+-    std::cout << "Initial state: cash=" << backtester.getCash() 
+-              << ", inventory=" << backtester.getInventory() << std::endl;
+-    
+-    auto strategy = std::make_unique<SimpleSellCancelStrategy>();
+-    backtester.setStrategy(std::move(strategy));
+-    
+-    std::vector<std::tuple<int64_t, std::vector<std::pair<double, double>>, std::vector<std::pair<double, double>>>> snapshots = {
+-        {1000, {{101.0, 1000}}, {{100.0, 30}}},
+-        {3000, {{103.0, 1000}}, {{102.0, 1000}}}
+-    };
+-    
+-    std::vector<std::tuple<int64_t, TradeSide, double, double>> trades = {
+-        {1500, TradeSide::kBuy, 100.0, 30}  // Покупатель снимает наши 30
+-    };
+-    
+-    std::cout << "Creating test files..." << std::endl;
+-    createTestL2File("test_sell_cancel_l2.csv", snapshots);
+-    createTestTradeFile("test_sell_cancel_trade.csv", trades);
+-    
+-    std::cout << "Loading L2 data..." << std::endl;
+-    backtester.loadL2Data("test_sell_cancel_l2.csv");
+-    
+-    std::cout << "Loading Trade data..." << std::endl;
+-    backtester.loadTradeData("test_sell_cancel_trade.csv");
+-    
+-    std::cout << "Running strategy..." << std::endl;
+-    backtester.runStrategy();
+-    
+-    std::cout << "\n=== Final State ===" << std::endl;
+-    std::cout << "Final cash: " << backtester.getCash() << std::endl;
+-    std::cout << "Final inventory: " << backtester.getInventory() << std::endl;
+-    std::cout << "Total orders placed: " << backtester.getTotalOrdersPlaced() << std::endl;
+-    std::cout << "Total fills: " << backtester.getTotalFills() << std::endl;
+-    
+-    const auto& fills = backtester.getFills();
+-    std::cout << "Fills count: " << fills.size() << std::endl;
+-    for (size_t i = 0; i < fills.size(); ++i) {
+-        std::cout << "  Fill " << i << ": order_id=" << fills[i].order_id
+-                  << ", side=" << (fills[i].side == Side::kBid ? "BUY" : "SELL")
+-                  << ", amount=" << fills[i].amount
+-                  << ", price=" << fills[i].price << std::endl;
+-    }
+-    
+-    // Должно исполниться 30 единиц продажи
+-    //EXPECT_DOUBLE_EQ(backtester.getInventory(), 70.0);  // Было 100, продали 30
+-    //EXPECT_DOUBLE_EQ(backtester.getCash(), 1000000.0 + 30.0 * 100.0);
+-    //EXPECT_EQ(backtester.getTotalFills(), 1);
+-    
+-    std::filesystem::remove("test_sell_cancel_l2.csv");
+-    std::filesystem::remove("test_sell_cancel_trade.csv");
+-    
+-    std::cout << "=== Test SellWithCancelAfterPartialFill END ===" << std::endl;
+-}
+\ No newline at end of file
+diff --git a/mm/hftbacktester/hftbacktester.h b/mm/hftbacktester/hftbacktester.h
+index 601b525..039fdee 100644
+--- a/mm/hftbacktester/hftbacktester.h
++++ b/mm/hftbacktester/hftbacktester.h
+@@ -47,8 +47,6 @@ private:
+     // Данные
+     std::shared_ptr<HistoryManager> history_manager;
+     bool use_external_history_manager = true;
+-    // std::vector<L2Snapshot> l2_data;
+-    // std::vector<ExternalTrade> trade_data;
+     
+     // Состояние ордеров
+     std::deque<Order> active_orders;
+@@ -203,101 +201,6 @@ public:
+     //для дебага
+     const MatchingEngine& getMatchingEngine() const { return matching_engine; }
+ 
+-    //генерация отчёта
+-    // void generateReport() const {
+-    //     if (portfolio_value.empty()) {
+-    //         std::cout << "No data to generate report.\n";
+-    //         return;
+-    //     }
+-
+-    //     double initial_capital = 1000000.00;
+-    //     double final_pnl = portfolio_value.back().second;
+-    //     double total_return = final_pnl - initial_capital;
+-    //     double return_pct = (total_return / initial_capital) * 100.0;
+-
+-    //     double max_pnl_so_far = -1e18;
+-    //     double max_drawdown = 0.0;
+-    //     for (const auto& p : portfolio_value) {
+-    //         max_pnl_so_far = std::max(max_pnl_so_far, p.second);
+-    //         double drawdown = max_pnl_so_far - p.second;
+-    //         max_drawdown = std::max(max_drawdown, drawdown);
+-    //     }
+-    //     double mdd_pct = (max_drawdown / max_pnl_so_far) * 100.0;
+-
+-    //     double sum_pnl = 0.0;
+-    //     for (const auto& p : portfolio_value) sum_pnl += p.second;
+-    //     double mean_pnl = sum_pnl / portfolio_value.size();
+-
+-    //     double variance = 0.0;
+-    //     for (const auto& p : portfolio_value) {
+-    //         variance += std::pow(p.second - mean_pnl, 2);
+-    //     }
+-    //     variance /= portfolio_value.size();
+-    //     double stddev = std::sqrt(variance);
+-        
+-    //     double ann_factor = std::sqrt(252.0 * 6.5 * 3600.0); 
+-    //     double sharpe = (stddev > 1e-9) ? (mean_pnl / stddev) * ann_factor : 0.0;
+-
+-    //     double max_inv = 0.0, min_inv = 0.0, avg_inv = 0.0;
+-    //     for (const auto& inv : inventory_history) {
+-    //         max_inv = std::max(max_inv, inv.second);
+-    //         min_inv = std::min(min_inv, inv.second);
+-    //         avg_inv += std::abs(inv.second);
+-    //     }
+-    //     avg_inv /= (inventory_history.size() > 0 ? inventory_history.size() : 1);
+-
+-    //     double buy_vol = 0, sell_vol = 0;
+-    //     int buy_count = 0, sell_count = 0;
+-    //     for (const auto& f : fills) {
+-    //         if (f.side == Side::kBid) { buy_vol += f.amount; buy_count++; }
+-    //         else { sell_vol += f.amount; sell_count++; }
+-    //     }
+-
+-    //     std::cout << std::fixed << std::setprecision(2);
+-    //     std::cout << "\n============================================================\n";
+-    //     std::cout << "              HFT DETAILED BACKTEST REPORT                   \n";
+-    //     std::cout << "============================================================\n";
+-
+-    //     std::cout << "\n[1. FINANCIAL PERFORMANCE]\n";
+-    //     std::cout << "  Initial Capital:        $" << initial_capital << "\n";
+-    //     std::cout << "  Final Equity (MtM):     $" << final_pnl << "\n";
+-    //     std::cout << "  Total Net Profit:       $" << (total_return >= 0 ? "+" : "") << total_return << "\n";
+-    //     std::cout << "  Total Return:           " << return_pct << "%\n";
+-    //     std::cout << "  Total Turnover:         $" << turnover << "\n";
+-
+-    //     std::cout << "\n[2. RISK METRICS]\n";
+-    //     std::cout << "  Max Drawdown:           $" << max_drawdown << " (" << mdd_pct << "%)\n";
+-    //     std::cout << "  Annualized Sharpe:      " << std::setprecision(3) << sharpe << "\n";
+-    //     std::cout << "  Daily Volatility (PnL): $" << std::setprecision(2) << stddev << "\n";
+-
+-    //     std::cout << "\n[3. INVENTORY ANALYSIS]\n";
+-    //     std::cout << "  Max Long Exposure:      " << max_inv << " units\n";
+-    //     std::cout << "  Max Short Exposure:     " << min_inv << " units\n";
+-    //     std::cout << "  Average Absolute Inv:   " << avg_inv << " units\n";
+-
+-    //     std::cout << "\n[4. EXECUTION & ACTIVITY]\n";
+-    //     std::cout << "  Total Orders Placed:    " << total_orders_placed << "\n";
+-    //     std::cout << "  Total Fills:            " << total_fills << "\n";
+-    //     std::cout << "  Fill Rate:              " << (total_orders_placed > 0 ? (100.0 * total_fills / total_orders_placed) : 0.0) << "%\n";
+-    //     std::cout << "  Buy Fills / Sell Fills: " << buy_count << " / " << sell_count << "\n";
+-    //     std::cout << "  Avg Profit per Fill:    $" << (total_fills > 0 ? total_return / total_fills : 0.0) << "\n";
+-
+-    //     std::cout << "\n[5. PNL BREAKDOWN]\n";
+-    //     std::cout << "  Realized PnL:          $" << std::fixed << std::setprecision(2) << realized_pnl << "\n";
+-    //     std::cout << "  Unrealized PnL:        $" << unrealized_pnl << "\n";
+-    //     std::cout << "  Total PnL:             $" << (realized_pnl + unrealized_pnl) << "\n";
+-        
+-    //     if (std::abs(inventory) > kVolEps) {
+-    //         std::cout << "  Current Inventory:     " << std::abs(inventory) << " units\n";
+-    //         std::cout << "  Position Direction:    " << (inventory > 0 ? "LONG" : "SHORT") << "\n";
+-    //         std::cout << "  Avg Entry Price:       $" << avg_entry_price << "\n";
+-    //         double current_price = (matching_engine.getBestBid() + matching_engine.getBestAsk()) / 2.0;
+-    //         std::cout << "  Current Market Price:  $" << current_price << "\n";
+-    //         std::cout << "  Unrealized per unit:   $" << (inventory > 0 ? current_price - avg_entry_price : avg_entry_price - current_price) << "\n";
+-            
+-    //         std::cout << "\n============================================================\n";
+-    //     }
+-    // }
+     void generateReport() const {
+         if (portfolio_value.empty()) {
+             std::cout << "No data to generate report.\n";
+@@ -448,23 +351,15 @@ private:
+                 uint64_t l2_ts = history_manager->getL2(current_l2_idx).timestamp;
+                 uint64_t tr_ts = history_manager->getTrade(current_trade_idx).timestamp;
+ 
+-                // ЛОГИРОВАНИЕ СРАВНЕНИЯ
+-                // std::cout << "[Compare] LOB TS: " << l2_ts 
+-                //         << " vs Trade TS: " << tr_ts;
+-
+                 if (l2_ts <= tr_ts) {
+                     process_l2 = true;
+-                    //std::cout << " -> Selecting LOB (LOB is earlier or equal)" << std::endl;
+                 } else {
+                     process_l2 = false;
+-                    //std::cout << " -> Selecting TRADE (Trade is earlier)" << std::endl;
+                 }
+             } else if (has_l2) {
+                 process_l2 = true;
+-                //std::cout << "[Queue] Trades exhausted. Selecting LOB: " << l2_data[current_l2_idx].timestamp << std::endl;
+             } else {
+                 process_l2 = false;
+-                //std::cout << "[Queue] LOB data exhausted. Selecting TRADE: " << trade_data[current_trade_idx].timestamp << std::endl;
+             }
+             
+             if (process_l2) {
+@@ -532,14 +427,14 @@ private:
+ 
+                     auto l2 = matching_engine.fillL2Snapshot();
+                     // Создаем контекст с текущим состоянием
+-                    //MarketContext ctx{std::move(l2), inventory, cash, start_timestamp, current_timestamp };
++                    //MarketContext ctx{std::move(l2), inventory, cash, start_timestamp, current_timestamp };?
+ 
+                     
+                     if (collect && data_collector) {
+-                        //data_collector->onMarketContext(ctx);
++                        //data_collector->onMarketContext(ctx);?
+                     }
+                     if (execute_strategy && strategy) {
+-                        //strategy->onMarketContext(ctx, this);
++                        //strategy->onMarketContext(ctx, this);?
+                     }
+                 }
+                 updatePortfolio();
+@@ -594,58 +489,6 @@ private:
+         total_sell_value = 0.0;
+     }
+ 
+-    // void executeInnerTrade(const InnerTrade& trade) {
+-    //     // Проверяем, участвовал ли наш ордер в сделке
+-    //     auto role = trade.getOurRole();
+-        
+-    //     if (role == InnerTrade::OurRole::kAggressor || role == InnerTrade::OurRole::kPassive) {
+-    //         Fill fill;
+-    //         fill.timestamp = trade.timestamp;
+-    //         fill.price = trade.price;
+-    //         fill.amount = trade.amount;
+-    //         fill.order_id = trade.getOurOrderId();
+-    //         double trade_pnl = 0.0;  // PnL от этой сделки
+-
+-    //         // Определяем сторону нашего ордера
+-    //         if (role == InnerTrade::OurRole::kAggressor) {
+-    //             // Наш ордер был агрессивным (рыночным или лимитным, который пришел и снял ликвидность)
+-    //             if (trade.side == TradeSide::kBuy) {
+-    //                 fill.side = Side::kBid;
+-    //                 inventory += trade.amount;
+-    //                 cash -= trade.amount * trade.price;
+-    //             } else {
+-    //                 fill.side = Side::kAsk;
+-    //                 inventory -= trade.amount;
+-    //                 cash += trade.amount * trade.price;
+-    //             }
+-    //         } else {
+-    //             // Наш ордер был пассивным (лимитным в книге)
+-    //             if (trade.side == TradeSide::kBuy) {
+-    //                 // Агрессор покупал -> мы продавали
+-    //                 fill.side = Side::kAsk;
+-    //                 inventory -= trade.amount;
+-    //                 cash += trade.amount * trade.price;
+-    //             } else {
+-    //                 // Агрессор продавал -> мы покупали
+-    //                 fill.side = Side::kBid;
+-    //                 inventory += trade.amount;
+-    //                 cash -= trade.amount * trade.price;
+-    //             }
+-    //         }
+-            
+-    //         fills.push_back(fill);
+-    //         turnover += trade.amount * trade.price;
+-    //         total_fills++;
+-            
+-    //         if (strategy) {
+-    //             strategy->onFill(fill);
+-    //         }
+-    //         if (data_collector) {
+-    //             data_collector->onFill(fill);
+-    //         }
+-    //     }
+-    // }
+-
+     // Универсальный метод executeInnerTrade:
+     void executeInnerTrade(const InnerTrade& trade) {
+         auto role = trade.getOurRole();
+@@ -741,12 +584,6 @@ private:
+             if (strategy) strategy->onFill(fill);
+             if (data_collector) data_collector->onFill(fill);
+             
+-            // Логирование
+-            // std::cout << "Trade: qty=" << fill.amount << ", price=" << fill.price 
+-            //         << ", side=" << (fill.side == Side::kBid ? "BUY" : "SELL")
+-            //         << ", trade_pnl=" << trade_pnl
+-            //         << ", realized_pnl=" << realized_pnl
+-            //         << ", inventory=" << inventory << std::endl;
+         }
+     }
+ 
+@@ -776,25 +613,6 @@ private:
+     }
+ 
+     void updatePortfolio() {
+-        // // Получаем текущие лучшие цены из matching engine
+-        // double best_bid = matching_engine.getBestBid();
+-        // double best_ask = matching_engine.getBestAsk();
+-        
+-        // // Если нет ликвидности, не обновляем статистику
+-        // if (best_bid < kPriceEps || best_ask < kPriceEps) {
+-        //     return;
+-        // }
+-        
+-        // // Расчет mid price (средняя цена между бидом и аском)
+-        // double mid_price = (best_bid + best_ask) / 2.0;
+-        
+-        // // Расчет текущей PnL (реализованная + нереализованная)
+-        // // Нереализованная PnL = inventory * mid_price
+-        // // Реализованная PnL уже в cash (относительно начального капитала)
+-        // double current_pnl = cash + inventory * mid_price;
+-        
+-        // // Обновляем total_pnl для отчета
+-        // total_pnl = current_pnl;
+         double best_bid = matching_engine.getBestBid();
+         double best_ask = matching_engine.getBestAsk();
+         
+diff --git a/mm/matching_engine/matching_engine.h b/mm/matching_engine/matching_engine.h
+index 2b3d146..6021a10 100644
+--- a/mm/matching_engine/matching_engine.h
++++ b/mm/matching_engine/matching_engine.h
+@@ -531,52 +531,23 @@ private:
+             order.side,
+             order.type
+         };
+-        
+-        auto it = std::find_if(bids_.begin(), bids_.end(),
+-            [&order](const OrderBookLevel& level) { 
+-                return std::abs(level.price - order.price) < kPriceEps; 
++
++        // Ищем позицию, где цена <= order.price (bids: по убыванию)
++        auto it = std::lower_bound(bids_.begin(), bids_.end(), order.price,
++            [](const OrderBookLevel& level, double price) {
++                return level.price > price;
+             });
+-        
+-        if (it != bids_.end()) {
++
++        // Проверяем, есть ли уже уровень с этой ценой
++        if (it != bids_.end() && std::abs(it->price - order.price) < kPriceEps) {
+             it->orders.push_back(book_order);
+         } else {
++            // Вставляем новый уровень
+             OrderBookLevel new_level{order.price, {book_order}};
+-            auto insert_pos = std::lower_bound(bids_.begin(), bids_.end(), new_level,
+-                [](const OrderBookLevel& a, const OrderBookLevel& b) { 
+-                    return a.price > b.price;
+-                });
+-            bids_.insert(insert_pos, new_level);
++            bids_.insert(it, new_level);
+         }
+     }
+     
+-    // // Добавить лимитный ордер в asks
+-    // void addToAsks(const Order& order) {
+-    //     BookOrder book_order{
+-    //         order.order_id,
+-    //         order.price,
+-    //         order.amount,
+-    //         order.filled_amount,
+-    //         order.timestamp,
+-    //         order.side,
+-    //         order.type
+-    //     };
+-        
+-    //     auto it = std::find_if(asks_.begin(), asks_.end(),
+-    //         [&order](const OrderBookLevel& level) { 
+-    //             return std::abs(level.price - order.price) < kPriceEps; 
+-    //         });
+-        
+-    //     if (it != asks_.end()) {
+-    //         it->orders.push_back(book_order);
+-    //     } else {
+-    //         OrderBookLevel new_level{order.price, {book_order}};
+-    //         auto insert_pos = std::lower_bound(asks_.begin(), asks_.end(), new_level,
+-    //             [](const OrderBookLevel& a, const OrderBookLevel& b) { 
+-    //                 return a.price < b.price;
+-    //             });
+-    //         asks_.insert(insert_pos, new_level);
+-    //     }
+-    // }
+     void addToAsks(const Order& order) {
+         BookOrder book_order{
+             order.order_id, order.price, order.amount,
+@@ -586,7 +557,7 @@ private:
+         // Ищем позицию, где цена >= order.price
+         auto it = std::lower_bound(asks_.begin(), asks_.end(), order.price,
+             [](const OrderBookLevel& level, double price) {
+-                return level.price < price - kPriceEps; 
++                return level.price < price; 
+             });
+ 
+         // Проверяем, нашли ли мы существующий уровень цены
+diff --git a/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h b/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h
+deleted file mode 100644
+index 552dc95..0000000
+--- a/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_1.h
++++ /dev/null
+@@ -1,155 +0,0 @@
+-#pragma once
+-
+-#include "mm/type/market_context.h"
+-#include "mm/strategy/i_strategy.h"
+-#include "cmath"
+-#include "mm/hftbacktester/hftbacktester.h"
+-#include "mm/strategy/avelaneda_stoikov/config.h"
+-#include "mm/constants/constants.h"
+-#include <algorithm>
+-#include <fstream>
+-#include <chrono>
+-#include <iomanip>
+-
+-class AvellanedaStoikov1 : public IStrategy {
+-private:
+-    ASParams params;
+-    double order_size;
+-    double last_bid_quote = 0;
+-    double last_ask_quote = 0;
+-    
+-    // Логирование в файл
+-    mutable std::ofstream log_file;
+-    mutable bool log_initialized = false;
+-     mutable int log_counter = 0;
+-    const int LOG_INTERVAL = 100;  // Логировать каждые 100 тиков
+-    
+-    void initLog() const {
+-        if (!log_initialized) {
+-            // Создаем файл с timestamp
+-            auto now = std::chrono::system_clock::now();
+-            auto time_t = std::chrono::system_clock::to_time_t(now);
+-            std::tm* tm = std::localtime(&time_t);
+-            
+-            char filename[256];
+-            std::strftime(filename, sizeof(filename), "avelaneda_log_%Y%m%d_%H%M%S.csv", tm);
+-            
+-            log_file.open(filename);
+-            if (log_file.is_open()) {
+-                // Заголовки CSV
+-                log_file << "timestamp,inv,best_bid,best_ask,market_mid,skew,reservation_price,"
+-                        << "spread,spread_ticks,bid_quote,ask_quote,bid_dist,ask_dist,bid_send,ask_send\n";
+-            }
+-            log_initialized = true;
+-        }
+-    }
+-
+-    double computeMicroprice(const MEL2Snapshot& snap) const {
+-        if (snap.bids.empty() || snap.asks.empty()) return 0.0;
+-        
+-        double best_bid = snap.bids[0].first;
+-        double best_ask = snap.asks[0].first;
+-        
+-        double bid_volume = snap.bids[0].second;
+-        double ask_volume = snap.asks[0].second;
+-        
+-        double total_volume = bid_volume + ask_volume;
+-        if (total_volume < kVolEps) return (best_bid + best_ask) / 2.0;
+-        
+-        return (best_bid * ask_volume + best_ask * bid_volume) / total_volume;
+-    }
+-
+-public:
+-    AvellanedaStoikov1(ASParams p, double size) : params(p), order_size(size) {}
+-    
+-    ~AvellanedaStoikov1() {
+-        if (log_file.is_open()) {
+-            log_file.close();
+-        }
+-    }
+-
+-    void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+-        if (ctx.l2.bids.empty() || ctx.l2.asks.empty()) return;
+-        
+-        initLog();
+-
+-        double tick_size = 0.0000001;
+-        double best_bid = ctx.l2.bids[0].first;
+-        double best_ask = ctx.l2.asks[0].first;
+-        double market_mid = (best_bid + best_ask) / 2.0;
+-        
+-        // Для крипты игнорируем время
+-        double time_factor = 1.0;
+-        
+-        // Сдвиг из-за инвентаря (skew)
+-        double skew = -ctx.inventory * params.gamma * std::pow(params.sigma, 2) * time_factor;
+-        
+-        // Ограничиваем skew
+-        double max_skew_ticks = 100.0;
+-        double max_skew = max_skew_ticks * tick_size;
+-        skew = std::clamp(skew, -max_skew, max_skew);
+-        
+-        // Резервационная цена
+-        double reservation_price = market_mid + skew;
+-        
+-        // Оптимальный спред
+-        double spread = (2.0 / params.gamma) * std::log(1.0 + params.gamma / params.kappa);
+-        
+-        // Минимальный спред
+-        double min_spread = (best_ask - best_bid) + 2 * tick_size;  // рыночный спред + 2 тика
+-        spread = std::max(spread, min_spread);
+-        
+-        // Котировки
+-        double bid_quote = reservation_price - spread / 2.0;
+-        double ask_quote = reservation_price + spread / 2.0;
+-        
+-        // Округление до тика
+-        bid_quote = std::floor(bid_quote / tick_size + kPriceEps) * tick_size;
+-        ask_quote = std::ceil(ask_quote / tick_size - kPriceEps) * tick_size;
+-        
+-        // Корректировка
+-        bid_quote = std::min(bid_quote, best_ask - tick_size);
+-        ask_quote = std::max(ask_quote, best_bid + tick_size);
+-        
+-        // Проверка возможности отправки
+-        bool bid_send = (bid_quote < best_ask - tick_size && ctx.inventory < params.max_inventory);
+-        bool ask_send = (ask_quote > best_bid + tick_size && ctx.inventory > -params.max_inventory);
+-        
+-        // Логирование в файл (каждый тик)
+-        double calc_spread_ticks = spread / tick_size;
+-        double bid_dist = (best_bid - bid_quote) / tick_size;
+-        double ask_dist = (ask_quote - best_ask) / tick_size;
+-        
+-        // В onMarketContext:
+-        // log_counter++;
+-        // if (log_counter % LOG_INTERVAL == 0) {
+-        //     log_file << ctx.current_timestamp << ","
+-        //             << ctx.inventory << ","
+-        //             << best_bid << ","
+-        //             << best_ask << ","
+-        //             << market_mid << ","
+-        //             << skew << ","
+-        //             << reservation_price << ","
+-        //             << spread << ","
+-        //             << calc_spread_ticks << ","
+-        //             << bid_quote << ","
+-        //             << ask_quote << ","
+-        //             << bid_dist << ","
+-        //             << ask_dist << ","
+-        //             << (bid_send ? "YES" : "NO") << ","
+-        //             << (ask_send ? "YES" : "NO") << "\n";
+-        // }
+-        
+-        // Отмена старых ордеров
+-        api->cancelAll();
+-        
+-        // Выставление новых ордеров
+-        if (bid_send) {
+-            api->submitLimitOrder(Side::kBid, bid_quote, order_size);
+-        }
+-        
+-        if (ask_send) {
+-            api->submitLimitOrder(Side::kAsk, ask_quote, order_size);
+-        }
+-    }
+-};
+\ No newline at end of file
+diff --git a/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h b/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h
+index 0fd2299..f07ef9d 100644
+--- a/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h
++++ b/mm/strategy/avelaneda_stoikov/avalaneda_stoikov_microprice.h
+@@ -69,133 +69,6 @@ public:
+         }
+     }
+ 
+-    // void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+-    //     if (ctx.l2.bids.empty() || ctx.l2.asks.empty()) return;
+-        
+-    //     if (use_logging) initLog();
+-
+-    //     double tick_size = 0.0000001;
+-    //     double best_bid = ctx.l2.bids[0].first;
+-    //     double best_ask = ctx.l2.asks[0].first;
+-    //     double market_mid = (best_bid + best_ask) / 2.0;
+-        
+-    //     double microprice = computeMicroprice(ctx.l2);
+-        
+-    //     double time_factor = 1.0;
+-        
+-    //     // Сдвиг из-за инвентаря
+-    //     double skew = -ctx.inventory * params.gamma * std::pow(params.sigma, 2) * time_factor;
+-        
+-    //     // // Ограничиваем skew (максимум 50 тиков)
+-    //     // double max_skew_ticks = 50.0;
+-    //     // double max_skew = max_skew_ticks * tick_size;
+-    //     // skew = std::clamp(skew, -max_skew, max_skew);
+-        
+-    //     // Резервационная цена
+-    //     double reservation_price = microprice + skew;
+-        
+-    //     // Оптимальный спред
+-    //     double spread = (2.0 / params.gamma) * std::log(1.0 + params.gamma / params.kappa);
+-        
+-    //     // Минимальный спред - НЕ МЕНЕЕ 2 тиков
+-    //     double min_spread = 2.0 * tick_size;
+-    //     spread = std::max(spread, min_spread);
+-        
+-    //     // Базовые котировки
+-    //     double bid_quote = reservation_price - spread / 2.0;
+-    //     double ask_quote = reservation_price + spread / 2.0;
+-        
+-    //     // Округление до тика
+-    //     bid_quote = std::floor(bid_quote / tick_size + 1e-9) * tick_size;
+-    //     ask_quote = std::ceil(ask_quote / tick_size - 1e-9) * tick_size;
+-        
+-    //     // ============================================================
+-    //     // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: гарантируем, что bid НЕ ВЫШЕ best_bid
+-    //     // ============================================================
+-        
+-    //     // 1. Сначала корректируем bid и ask относительно рынка
+-    //     bid_quote = std::min(bid_quote, best_bid);           // bid не выше лучшего бида
+-    //     ask_quote = std::max(ask_quote, best_ask);           // ask не ниже лучшего аска
+-        
+-    //     // 2. Затем проверяем, что не пересекаем рынок
+-    //     double max_bid = best_ask - tick_size;               // максимально возможный bid
+-    //     double min_ask = best_bid + tick_size;               // минимально возможный ask
+-        
+-    //     bid_quote = std::min(bid_quote, max_bid);
+-    //     ask_quote = std::max(ask_quote, min_ask);
+-        
+-    //     // 3. Проверка, что котировки имеют смысл
+-    //     if (bid_quote >= ask_quote - tick_size) {
+-    //         // Спред схлопнулся - раздвигаем
+-    //         double mid = (best_bid + best_ask) / 2.0;
+-    //         bid_quote = mid - spread / 2.0;
+-    //         ask_quote = mid + spread / 2.0;
+-    //         bid_quote = std::floor(bid_quote / tick_size + 1e-9) * tick_size;
+-    //         ask_quote = std::ceil(ask_quote / tick_size - 1e-9) * tick_size;
+-    //         bid_quote = std::min(bid_quote, best_bid);
+-    //         ask_quote = std::max(ask_quote, best_ask);
+-    //         bid_quote = std::min(bid_quote, max_bid);
+-    //         ask_quote = std::max(ask_quote, min_ask);
+-    //     }
+-        
+-    //     // 4. Дополнительный отступ, если bid все еще слишком высок
+-    //     if (bid_quote > best_bid - tick_size) {
+-    //         bid_quote = best_bid - tick_size;
+-    //     }
+-    //     if (ask_quote < best_ask + tick_size) {
+-    //         ask_quote = best_ask + tick_size;
+-    //     }
+-        
+-    //     // Округляем еще раз после всех корректировок
+-    //     bid_quote = std::floor(bid_quote / tick_size + 1e-9) * tick_size;
+-    //     ask_quote = std::ceil(ask_quote / tick_size - 1e-9) * tick_size;
+-        
+-    //     // Проверка возможности отправки
+-    //     bool bid_send = (bid_quote < best_ask - tick_size && 
+-    //                      bid_quote < best_bid && 
+-    //                      ctx.inventory < params.max_inventory);
+-        
+-    //     bool ask_send = (ask_quote > best_bid + tick_size && 
+-    //                      ask_quote > best_ask && 
+-    //                      ctx.inventory > -params.max_inventory);
+-        
+-    //     // Логирование
+-    //     double calc_spread_ticks = spread / tick_size;
+-    //     double bid_dist = (best_bid - bid_quote) / tick_size;
+-    //     double ask_dist = (ask_quote - best_ask) / tick_size;
+-        
+-    //     log_counter++;
+-    //     // Логирование
+-    //     if (use_logging && ++log_counter % LOG_INTERVAL == 0 && log_file.is_open()) {
+-    //         log_file << ctx.current_timestamp << ","
+-    //                 << ctx.inventory << ","
+-    //                 << best_bid << ","
+-    //                 << best_ask << ","
+-    //                 << market_mid << ","
+-    //                 << microprice << ","
+-    //                 << skew << ","
+-    //                 << reservation_price << ","
+-    //                 << spread << ","
+-    //                 << calc_spread_ticks << ","
+-    //                 << bid_quote << ","
+-    //                 << ask_quote << ","
+-    //                 << bid_dist << ","
+-    //                 << ask_dist << ","
+-    //                 << (bid_send ? "YES" : "NO") << ","
+-    //                 << (ask_send ? "YES" : "NO") << "\n";
+-    //         log_file.flush();
+-    //     }
+-        
+-    //     api->cancelAll();
+-        
+-    //     if (bid_send) {
+-    //         api->submitLimitOrder(Side::kBid, bid_quote, order_size);
+-    //     }
+-        
+-    //     if (ask_send) {
+-    //         api->submitLimitOrder(Side::kAsk, ask_quote, order_size);
+-    //     }
+-    // }
+     void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+         if (ctx.l2.bids.empty() || ctx.l2.asks.empty()) return;
+         
+diff --git a/mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h b/mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h
+index eb1a143..a5d3c0a 100644
+--- a/mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h
++++ b/mm/strategy/avelaneda_stoikov/avelaneda_stoikov_classic_gmn.h
+@@ -14,39 +14,45 @@ class AvellanedaStoikovClassicGmn : public IStrategy {
+ private:
+     ASParams params;
+     double order_size;
+-    
++    bool use_logging = false;
+     mutable std::ofstream log_file;
+     mutable bool log_initialized = false;
+     mutable int log_counter = 0;
+     const int LOG_INTERVAL = 100;
+     
+-    // void initLog() const {
+-    //     if (!log_initialized) {
+-    //         auto now = std::chrono::system_clock::now();
+-    //         auto time_t = std::chrono::system_clock::to_time_t(now);
+-    //         std::tm* tm = std::localtime(&time_t);
+-    //         char filename[256];
+-    //         std::strftime(filename, sizeof(filename), "classic_as_log_%Y%m%d_%H%M%S.csv", tm);
++    void initLog() const {
++        if (!log_initialized) {
++            auto now = std::chrono::system_clock::now();
++            auto time_t = std::chrono::system_clock::to_time_t(now);
++            std::tm* tm = std::localtime(&time_t);
++            char filename[256];
++            std::strftime(filename, sizeof(filename), "classic_as_log_%Y%m%d_%H%M%S.csv", tm);
+             
+-    //         log_file.open(filename);
+-    //         if (log_file.is_open()) {
+-    //             log_file << "timestamp,inv,best_bid,best_ask,market_mid,inventory_bias,reservation_price,"
+-    //                     << "spread,spread_ticks,bid_quote,ask_quote,bid_dist,ask_dist,bid_send,ask_send\n";
+-    //         }
+-    //         log_initialized = true;
+-    //     }
+-    // }
++            log_file.open(filename);
++            if (log_file.is_open()) {
++                log_file << "timestamp,inv,best_bid,best_ask,market_mid,inventory_bias,reservation_price,"
++                        << "spread,spread_ticks,bid_quote,ask_quote,bid_dist,ask_dist,bid_send,ask_send\n";
++            }
++            log_initialized = true;
++        }
++    }
+ 
+ public:
+-    AvellanedaStoikovClassicGmn(ASParams p, double size) : params(p), order_size(size) {}
++    AvellanedaStoikovClassicGmn(ASParams p, double size, bool log_enabled = false) : 
++    params(p),
++    order_size(size),
++    use_logging(log_enabled) {}
+     
+     ~AvellanedaStoikovClassicGmn() {
+-        if (log_file.is_open()) log_file.close();
++        if (log_file.is_open()){
++            log_file.close();
++        }
+     }
+ 
+     void onMarketContext(const MarketContext& ctx, HFTBacktester* api) override {
+         if (ctx.l2.bids.empty() || ctx.l2.asks.empty()) return;
+-        //initLog();
++        
++        if (use_logging) initLog();
+ 
+         const double tick_size = 0.0000001; 
+         const double best_bid = ctx.l2.bids[0].first;
+@@ -86,21 +92,21 @@ public:
+         bool ask_valid = (ask_quote > best_bid);
+ 
+         // Логирование
+-        // if (++log_counter % LOG_INTERVAL == 0 && log_file.is_open()) {
+-        //     log_file << ctx.current_timestamp << ","
+-        //             << ctx.inventory << ","
+-        //             << best_bid << "," << best_ask << ","
+-        //             << mid_price << ","
+-        //             << inventory_bias << ","
+-        //             << reservation_price << ","
+-        //             << optimal_spread << ","
+-        //             << (optimal_spread / tick_size) << ","
+-        //             << bid_quote << "," << ask_quote << ","
+-        //             << (best_bid - bid_quote) / tick_size << ","
+-        //             << (ask_quote - best_ask) / tick_size << ","
+-        //             << (can_buy && bid_valid ? "YES" : "NO") << ","
+-        //             << (can_sell && ask_valid ? "YES" : "NO") << "\n";
+-        // }
++        if (use_logging && ++log_counter % LOG_INTERVAL == 0 && log_file.is_open()) {
++            log_file << ctx.current_timestamp << ","
++                    << ctx.inventory << ","
++                    << best_bid << "," << best_ask << ","
++                    << mid_price << ","
++                    << inventory_bias << ","
++                    << reservation_price << ","
++                    << optimal_spread << ","
++                    << (optimal_spread / tick_size) << ","
++                    << bid_quote << "," << ask_quote << ","
++                    << (best_bid - bid_quote) / tick_size << ","
++                    << (ask_quote - best_ask) / tick_size << ","
++                    << (can_buy && bid_valid ? "YES" : "NO") << ","
++                    << (can_sell && ask_valid ? "YES" : "NO") << "\n";
++        }
+ 
+         // 7. Работа с ордерами
+         api->cancelAll();
+diff --git a/mm/strategy/avelaneda_stoikov/old_config.h b/mm/strategy/avelaneda_stoikov/old_config.h
+deleted file mode 100644
+index 7b32b8f..0000000
+--- a/mm/strategy/avelaneda_stoikov/old_config.h
++++ /dev/null
+@@ -1,16 +0,0 @@
+-#pragma once
+-
+-// Avellaneda-Stoikov parameters
+-// используется для hft_backtester
+-// этот кофиг старый
+-// удалить
+-struct ASParamsOld {
+-    double gamma;      // risk aversion
+-    double kappa;      // resilience (order flow intensity)
+-    double sigma;      // volatility
+-    double T;          // time horizon (seconds)
+-    double inventory_target;
+-    
+-    ASParamsOld() : gamma(0.1), kappa(1.5), sigma(0.0001), 
+-                 T(3600.0), inventory_target(0.0) {}
+-};
+\ No newline at end of file

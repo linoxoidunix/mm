@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 11,
   "configurePresets": [
     {
       "name": "default",
@@ -9,7 +9,6 @@
       "binaryDir": "${sourceDir}/build/default",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_STANDARD": 23,
         "BUILD_TESTS_MM": "ON"
       }
     },
@@ -21,7 +20,6 @@
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_STANDARD": 23,
         "BUILD_TESTS_MM": "ON",
         "ENABLE_CLANG_TIDY": "OFF"
       }
@@ -34,7 +32,6 @@
       "binaryDir": "${sourceDir}/build/release-tests",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_STANDARD": 23,
         "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native -mtune=native -flto=auto",
         "CMAKE_EXE_LINKER_FLAGS_RELEASE": "-flto=auto",
         "BUILD_TESTS_MM": "ON",
@@ -49,7 +46,6 @@
       "binaryDir": "${sourceDir}/build/relwithdebinfo-tests",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_CXX_STANDARD": 23,
         "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
         "BUILD_TESTS_MM": "ON",
         "ENABLE_CLANG_TIDY": "OFF"
@@ -89,7 +85,7 @@
       "configuration": "Release",
       "output": {
         "outputOnFailure": true,
-        "verbosity": "normal"
+        "verbosity": "default"
       },
       "execution": {
         "noTestsAction": "error",
@@ -117,25 +113,6 @@
       }
     },
     {
-      "name": "release-specific-test",
-      "displayName": "Run Specific Release Test",
-      "description": "Run specific test in release mode (set TEST_NAME variable)",
-      "configurePreset": "release-with-tests",
-      "configuration": "Release",
-      "output": {
-        "outputOnFailure": true,
-        "verbosity": "normal"
-      },
-      "execution": {
-        "noTestsAction": "error"
-      },
-      "filter": {
-        "include": {
-          "name": "${TEST_NAME}"
-        }
-      }
-    },
-    {
       "name": "relwithdebinfo-tests",
       "displayName": "Run RelWithDebInfo Tests",
       "description": "Run all tests in RelWithDebInfo mode",
@@ -143,7 +120,7 @@
       "configuration": "RelWithDebInfo",
       "output": {
         "outputOnFailure": true,
-        "verbosity": "normal"
+        "verbosity": "default"
       },
       "execution": {
         "noTestsAction": "error",

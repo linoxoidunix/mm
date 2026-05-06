@@ -33,7 +33,7 @@ struct BacktestResult {
     double final_inventory;
     double avg_entry_price;
     int64_t execution_time_ms;
-    double perfomance;// = execution_time_ms / history_manager.getTotalEvents
+    double perfomance;// = execution_time_ms / history_manager.getTotalEvents * 1000
 };
 
 // Атомарные счетчики
@@ -90,7 +90,7 @@ BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
     result.execution_time_ms = execution_time;
     auto total_events = hm->getTotalEvents();
     result.perfomance = total_events? result.execution_time_ms * 1.0 / hm->getTotalEvents() : 0;
-    result.perfomance = result.perfomance * 1000;//convert to mks from ms
+    result.perfomance = result.perfomance * 1000;//convert to mcs from ms
 
     // Прогресс
     int completed = ++completed_count;

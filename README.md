@@ -90,7 +90,7 @@ The backtester generates comprehensive reports with the following metrics:
 | `final_inventory` | Final inventory position |
 | `avg_entry_price` | Average entry price across all fills |
 | `execution_time_ms` | Total simulation execution time in milliseconds |
-| `perfomamce` | Total simulation execution time in milliseconds per single event (trade or L2 update) |
+| `perfomamce` | Total simulation execution time in microseconds per single event (trade or L2 update) |
 
 
 ## 🔧 Requirements
@@ -113,10 +113,8 @@ git clone https://github.com/linoxoidunix/mm.git
 cd mm
 
 # Build with CMake
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release \
-       -DCMAKE_CXX_FLAGS_RELEASE="-O3 -march=native -DNDEBUG"
-make -j16
+cmake --preset release
+cmake --build --preset release-examples
 ```
 
 ## 📥 Downloading Data
@@ -135,7 +133,7 @@ Run the strategy on historical data with parameterized variables:
 
 ```bash
 cd build/release/examples/example1
-./example1 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+./example1 ../../../../data/synced_lob.csv ../../../../data/synced_trades.csv
 ```
 Results will be written to backtest_results_summary.csv
 
@@ -144,7 +142,7 @@ Run the strategy on historical data with parameterized variables:
 
 ```bash
 cd build/release/examples/example2
-./example2 ../../../data/synced_lob.csv ../../../data/synced_trades.csv
+./example2 ../../../../data/synced_lob.csv ../../../../data/synced_trades.csv
 ```
 Results will be written to backtest_results_summary.csv
 

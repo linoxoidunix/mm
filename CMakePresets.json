@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 10,
   "configurePresets": [
     {
       "name": "default",
@@ -53,6 +53,18 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "release-examples",
+      "displayName": "Build Release Examples",
+      "description": "Build example targets in release mode",
+      "configurePreset": "release",
+      "configuration": "Release",
+      "targets": [
+        "example1",
+        "example2",
+        "example3"
+      ]
+    },
     {
       "name": "release-tests",
       "displayName": "Build Release Tests",

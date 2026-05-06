@@ -91,7 +91,7 @@ BacktestResult runBacktest(std::shared_ptr<HistoryManager> hm,
     result.execution_time_ms = execution_time;
     auto total_events = hm->getTotalEvents();
     result.perfomance = total_events? result.execution_time_ms * 1.0 / hm->getTotalEvents() : 0;//ms
-    result.perfomance = result.perfomance * 1000;//convert to mks from ms
+    result.perfomance = result.perfomance * 1000;//convert to mcs from ms
 
     // Прогресс
     int completed = ++completed_count;

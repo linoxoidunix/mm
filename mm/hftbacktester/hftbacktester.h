@@ -23,13 +23,23 @@
 #include "mm/matching_engine/matching_engine.h"
 #include "mm/history_manager/history_manager.h"
 
+/**
+ * @brief Represents the current state of the backtest simulation.
+ * 
+ * Used for saving/restoring simulation progress and checkpointing.
+ */
 struct SimulationState {
-    size_t current_l2_idx;
-    size_t current_trade_idx;
-    double current_cash;
-    double current_inventory;
+    size_t current_l2_idx;      ///< Current index in L2 snapshot sequence
+    size_t current_trade_idx;   ///< Current index in trade sequence
+    double current_cash;        ///< Current cash balance
+    double current_inventory;   ///< Current inventory position
 };
 
+/**
+ * @brief Configuration structure for HFTBacktester initialization.
+ * 
+ * Contains all configurable parameters for the backtesting engine.
+ */
 struct HFTBacktesterConfig{
     double inventory = 0.0;
     double cash = 1000000.0;
@@ -38,6 +48,12 @@ struct HFTBacktesterConfig{
     bool use_probabilistic_execution = false;
 };
 
+/**
+ * @brief Main backtesting engine for High-Frequency Trading strategies.
+ * 
+ * Simulates order book dynamics, matches orders, processes market data,
+ * and executes trading strategies on historical L2 and trade data.
+ */
 class HFTBacktester {
 private:
     HFTBacktesterConfig config;
@@ -82,6 +98,10 @@ private:
     double total_sell_value = 0.0;  // Суммарная стоимость продаж
 
 public:
+    /**
+     * @brief Constructs a backtester with internal HistoryManager.
+     * @param _config Configuration parameters for the backtester.
+     */
     HFTBacktester(HFTBacktesterConfig&& _config) : config(std::move(_config)) {
         use_external_history_manager = false;
         inventory_history.reserve(10000000);
@@ -91,6 +111,11 @@ public:
         cash = config.cash;
         turnover = config.turnover;
     }
+    /**
+     * @brief Constructs a backtester with external HistoryManager.
+     * @param _config Configuration parameters for the backtester.
+     * @param _history_manager Shared pointer to external HistoryManager instance.
+     */
     HFTBacktester(HFTBacktesterConfig&& _config, std::shared_ptr<HistoryManager> _history_manager) : config(std::move(_config)) {
         history_manager = _history_manager;
         inventory_history.reserve(10000000);
@@ -100,13 +125,28 @@ public:
         cash = config.cash;
         turnover = config.turnover;
     }
-
+    /**
+     * @brief Sets the trading strategy to be backtested.
+     * @param s Unique pointer to IStrategy implementation.
+     */
     void setStrategy(std::unique_ptr<IStrategy> s) { strategy = std::move(s); }
+    /**
+     * @brief Sets the data collector for recording simulation events.
+     * @param f Unique pointer to IFastDataCollector implementation.
+     */
     void setDataCollector(std::unique_ptr<IFastDataCollector> f) { data_collector = std::move(f); }
 
     // ==============================
-    // API ДЛЯ СТРАТЕГИИ
+    // API FOR STRATEGY
     // ==============================
+
+    /**
+     * @brief Submits a limit order to the order book.
+     * @param side Order side (kBid for buy, kAsk for sell).
+     * @param price Limit price for the order.
+     * @param qty Quantity to trade.
+     * @return Reference to the submitted order (order_id).
+     */
     OrderRef submitLimitOrder(Side side, double price, double qty){
         Order order{LimitOrderRef(next_order_id++), current_timestamp, side, OrderType::kLimit, price, qty, 0};
         auto trades = matching_engine.addLimitOrder(order);
@@ -117,6 +157,12 @@ public:
         }
         return order.order_id;
     }
+    /**
+     * @brief Submits a market order to the order book.
+     * @param side Order side (kBid for buy, kAsk for sell).
+     * @param qty Quantity to trade.
+     * @return Reference to the submitted order (order_id).
+     */
     OrderRef submitMarketOrder(Side side, double qty){
         Order order{MarketOrderRef{next_order_id++}, current_timestamp, side, OrderType::kMarket, 0/*не используется цена*/, qty};
         auto trades = matching_engine.addMarketOrder(order);
@@ -126,20 +172,30 @@ public:
         }
         return order.order_id;
     }
-
+    /**
+     * @brief Cancels all active orders belonging to this strategy.
+     */
     void cancelAll(){
         matching_engine.cancelAllOurOrders();
     }
-
+    /**
+     * @brief Cancels a specific order by its reference.
+     * @param order_ref Reference to the order to cancel.
+     * @return true if order was found and cancelled, false otherwise.
+     */
     bool cancelOrder(OrderRef order_ref){
         return matching_engine.cancelOrder(order_ref);
     }
    
 
     // ==============================
-    // ЗАГРУЗКА ДАННЫХ
+    // DATA LOADING
     // ==============================
 
+    /**
+     * @brief Loads L2 order book snapshot data from a CSV file.
+     * @param filename Path to the L2 data CSV file.
+     */
     void loadL2Data(const std::string& filename) {
         if(!use_external_history_manager){
             if(!history_manager){
@@ -149,6 +205,10 @@ public:
         }
     }
 
+    /**
+     * @brief Loads trade data from a CSV file.
+     * @param filename Path to the trade data CSV file.
+     */
     void loadTradeData(const std::string& filename) {
         if(!use_external_history_manager){
             if(!history_manager){
@@ -159,8 +219,14 @@ public:
     }
 
     // ==============================
-    // ЛОГИКА ИСПОЛНЕНИЯ
+    // SIMULATION EXECUTION
     // ==============================
+
+    /**
+     * @brief Runs data collection mode without strategy execution.
+     * @param ratio Fraction of data to process (0.0-1.0).
+     * @return Optional SimulationState with current indices and portfolio.
+     */
     std::optional<SimulationState> collectData(double ratio = 1.0) {
         if(!history_manager)
             return std::nullopt;
@@ -168,7 +234,10 @@ public:
         size_t limit = static_cast<size_t>((history_manager->getL2Size() + history_manager->getTradeSize()) * ratio);
         return runEngine(true, false, 0, 0, limit);
     }
-
+    /**
+     * @brief Runs full backtest with strategy execution from start.
+     * @return true if simulation completed successfully, false otherwise.
+     */
     bool runStrategy() {        
         if(!history_manager)
             return false;
@@ -177,7 +246,11 @@ public:
         runEngine(false, true, 0, 0, limit);
         return true;
     }
-
+    /**
+     * @brief Runs full backtest with strategy execution from saved state.
+     * @param state SimulationState to resume from.
+     * @return true if simulation completed successfully, false otherwise.
+     */
     bool runStrategy(const SimulationState& state) {
         if(!history_manager)
             return false;
@@ -187,20 +260,69 @@ public:
         return true;
     }
 
+    /**
+     * @brief Returns current cash balance.
+     * @return Current cash amount.
+     */
     double getCash() const { return cash; }
+    /**
+     * @brief Returns current inventory position.
+     * @return Current inventory (positive = long, negative = short).
+     */
     double getInventory() const { return inventory; }
+    /**
+     * @brief Returns current total equity (cash + unrealized PnL).
+     * @return Total equity value.
+    */
     double getEquity() const { return equity; }
+     /**
+     * @brief Returns total turnover (total traded volume in quote currency).
+     * @return Total turnover amount.
+     */
     double getTurnover() const { return turnover; }
+     /**
+     * @brief Returns all fills generated during simulation.
+     * @return Const reference to vector of fills.
+     */
     const std::vector<Fill>& getFills() const { return fills; }
+     /**
+     * @brief Returns total number of orders placed.
+     * @return Order count.
+     */
     int getTotalOrdersPlaced() const { return total_orders_placed; }
+     /**
+     * @brief Returns total number of fills (executed orders).
+     * @return Fill count.
+     */
     int getTotalFills() const { return total_fills; }
+      /**
+     * @brief Returns realized profit and loss.
+     * @return Realized PnL amount.
+     */
     double getRealizedPnL() const { return realized_pnl; }
+    /**
+     * @brief Returns unrealized profit and loss from open positions.
+     * @return Unrealized PnL amount.
+     */
     double getUnrealizedPnL() const { return unrealized_pnl; }
+     /**
+     * @brief Returns average entry price for the current position.
+     * @return Average entry price.
+     */
     double getAvgEntryPrice() const { return avg_entry_price; }
 
-    //для дебага
+    /**
+     * @brief Returns the internal matching engine (for debugging).
+     * @return Const reference to MatchingEngine.
+     */
     const MatchingEngine& getMatchingEngine() const { return matching_engine; }
 
+    /**
+     * @brief Generates and prints a detailed backtest report.
+     * 
+     * Includes financial performance, risk metrics, inventory analysis,
+     * execution statistics, and PnL breakdown.
+     */
     void generateReport() const {
         if (portfolio_value.empty()) {
             std::cout << "No data to generate report.\n";
@@ -323,6 +445,15 @@ public:
     }
 
 private:
+    /**
+     * @brief Core simulation engine that processes events sequentially.
+     * @param collect Enable data collection mode.
+     * @param execute_strategy Enable strategy execution mode.
+     * @param _current_l2_idx Starting L2 snapshot index.
+     * @param _current_trade_idx Starting trade index.
+     * @param limit Maximum number of events to process.
+     * @return SimulationState after processing.
+     */
     SimulationState runEngine(bool collect, bool execute_strategy, size_t _current_l2_idx, size_t _current_trade_idx, size_t limit) {
          if(!history_manager)
             return {_current_l2_idx, _current_trade_idx, cash, inventory};
@@ -449,21 +580,29 @@ private:
             inventory 
         };
     }
-
+    /**
+     * @brief Clears inventory history vector.
+     */
     void ResetInventoryHistory(){
         inventory_history.clear();
     }
-
+    /**
+     * @brief Clears PnL history vector.
+     */
     void ResetPnlHistory(){
         portfolio_value.clear();
     }
-
+    /**
+     * @brief Resets portfolio to initial configuration values.
+     */
     void ResetToDefaultConfig(){
         inventory = config.inventory;
         cash = config.cash;
         turnover = config.turnover;
     }
-
+    /**
+     * @brief Resets all backtester state to initial conditions.
+     */
     void ResetStateBacktester(){
         current_l2 = {};
         start_timestamp = 0;
@@ -489,7 +628,10 @@ private:
         total_sell_value = 0.0;
     }
 
-    // Универсальный метод executeInnerTrade:
+    /**
+     * @brief Executes an inner trade from the matching engine.
+     * @param trade InnerTrade containing execution details.
+     */
     void executeInnerTrade(const InnerTrade& trade) {
         auto role = trade.getOurRole();
         
@@ -587,7 +729,12 @@ private:
         }
     }
 
-    // Вспомогательный метод для определения направления
+    /**
+     * @brief Determines if we are the buyer in a trade.
+     * @param trade The inner trade.
+     * @param role Our role in the trade (Aggressor or Passive).
+     * @return true if we are buying, false if selling.
+     */
     bool determineIfWeAreBuying(const InnerTrade& trade, InnerTrade::OurRole role) {
         if (role == InnerTrade::OurRole::kAggressor) {
             return (trade.side == TradeSide::kBuy);
@@ -596,7 +743,9 @@ private:
         }
     }
 
-    // Обновление средней цены входа
+    /**
+     * @brief Updates the average entry price based on current position.
+     */
     void updateAverageEntryPrice() {
         if (std::abs(inventory) < kVolEps) {
             avg_entry_price = 0.0;
@@ -612,6 +761,9 @@ private:
         }
     }
 
+    /**
+     * @brief Updates portfolio values including unrealized PnL.
+     */
     void updatePortfolio() {
         double best_bid = matching_engine.getBestBid();
         double best_ask = matching_engine.getBestAsk();
@@ -646,7 +798,9 @@ private:
         portfolio_value.push_back({current_timestamp, equity});
         inventory_history.push_back({current_timestamp, inventory});
     }
-
+    /**
+     * @brief Updates average entry price using FIFO accounting.
+     */
     void updateAvgEntryPrice() {
         if (std::abs(inventory) < kVolEps) {
             avg_entry_price = 0.0;
